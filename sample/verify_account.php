@@ -5,7 +5,6 @@ if (!isset($_GET['uid'])) {
 }
 $userID = $_GET['uid'];
 
-
 require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
@@ -45,7 +44,6 @@ if (isset($_POST['submit'])) {
         die($e->getMessage());
     }
 }
-
 
 ?>
 <!DOCTYPE html>

@@ -38,7 +38,7 @@ if (isset($_POST['submit'])) {
         $_SESSION['userID'] = $userID;
         $_SESSION['token'] = $token;
 
-        header("Location: ./index.php");
+        // header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();
         die();
