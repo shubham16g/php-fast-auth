@@ -5,7 +5,6 @@ if (!isset($_GET['uid'])) {
 $userID = $_GET['uid'];
 $withOTP = false;
 
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 $auth = new FastAuth();
@@ -35,9 +34,7 @@ if (isset($_POST['submit'])) {
 if (isset($_GET['otp'])) {
     $otp = $_GET['otp'];
     try {
-        if ($auth->verifyOTP($otp, $userID, FastAuth::FOR_RESET_PASSWORD)) {
-            $withOTP = true;
-        }
+        $withOTP = $auth->isValidOtpToResetPassword($userID, $otp); //return bool
     } catch (Exception $e) {
         die($e->getMessage());
     }

@@ -1,6 +1,5 @@
 <?php
-
-require '../class.FastAuthConstants.php';
+session_start();
 require '../class.FastAuth.php';
 
 if (isset($_POST['submit'])) {
@@ -11,7 +10,7 @@ if (isset($_POST['submit'])) {
     $auth = new FastAuth();
     try {
         if ($for == FastAuth::FOR_RESET_PASSWORD) {
-            $auth->verifyOTP($otp, $userID, $for);
+            $auth->isValidOtpToResetPassword($userID, $otp);
             header("Location: reset_password.php?uid=$userID&otp=$otp");
         } else {
             $title = '';
@@ -21,12 +20,25 @@ if (isset($_POST['submit'])) {
                 $auth->verifyMobile($userID, $otp);
                 $title = "Mobile number verification successful";
             } elseif ($for == FastAuth::FOR_VERIFY_EMAIL) {
-                $auth->verifyMobile($userID, $otp);
+                $auth->verifyEmail($userID, $otp);
                 $title = "Email verification successful";
+            } elseif ($for == FastAuth::FOR_VERIFY_CREATED_ACCOUNT) {
+                $auth->verifyCreatedUser($userID, $otp);
+
+                $signInResult = $auth->forceSignIn($userID);
+                /* $signInResult = [
+                    'userID' => <int>,
+                    'token' => <string>,
+                    'isSigned' => <bool>
+                ] */
+                $_SESSION['userID'] = $signInResult['userID'];
+                $_SESSION['token'] = $signInResult['token'];
+                $_SESSION['isSigned'] = $signInResult['isSigned'];
+                $content = json_encode($signInResult);
+                $title = "Account verification successful";
             }
             header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
         }
-        
     } catch (Exception $e) {
         die($e->getMessage());
     }

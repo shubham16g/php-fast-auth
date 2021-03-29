@@ -23,7 +23,7 @@ if (isset($_POST['submit'])) {
             $userData = $auth->getUserByEmail($emailOrMobile);
         }
         $userID = $userData['userID'];
-        $otp = $auth->generateOTP($userID, FastAuth::FOR_RESET_PASSWORD);
+        $otp = $auth->getOtpToResetPassword($userID);
 
         $title = urlencode("OTP sent to $emailOrMobile");
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");

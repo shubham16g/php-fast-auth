@@ -5,7 +5,6 @@ session_start();
 if (!isset($_SESSION['userID']) || !isset($_SESSION['token'])) {
     header("Location: signin.php");
 }
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 $auth = new FastAuth();
@@ -15,10 +14,6 @@ try {
     $userID = $_SESSION['userID'];
     $auth->verifyUser($userID, $_SESSION['token']);
     $userData = $auth->getUser($userID);
-
-    if (!$userData['emailVerified'] && !$userData['mobileVerified']) {
-        header("Location: verify_account.php?uid=$userID");
-    }
 
     $userJson = json_encode($userData, JSON_PRETTY_PRINT);
 } catch (Exception $e) {

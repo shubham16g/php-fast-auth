@@ -7,7 +7,6 @@ if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 if (isset($_POST['submit'])) {
@@ -32,8 +31,8 @@ if (isset($_POST['submit'])) {
         } else {
             $signInResult = $auth->signInWithEmailAndPassword($emailOrMobile, $password);
         }
-        $userID = $signInResult['userData']['userID'];
-        $token = $signInResult['tokenData']['token'];
+        $userID = $signInResult['userID'];
+        $token = $signInResult['token'];
 
         $_SESSION['userID'] = $userID;
         $_SESSION['token'] = $token;

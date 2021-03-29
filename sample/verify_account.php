@@ -5,7 +5,6 @@ if (!isset($_GET['uid'])) {
 }
 $userID = $_GET['uid'];
 
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 $auth = new FastAuth();
@@ -27,13 +26,12 @@ if (isset($_POST['submit'])) {
 
     try {
         $postVerify = $_POST['toVerify'];
-        $for;
-        if (strpos($postVerify, ' ')) { //email doesn't contain space, you can do you own logic
-            $for = FastAuth::FOR_VERIFY_MOBILE;
+        $otp;
+        if (strpos($postVerify, '@')) { //email contain @, you can do you own logic
+            $otp = $auth->getOtpToVerifyEmail($userID);
         } else {
-            $for = FastAuth::FOR_VERIFY_EMAIL;
+            $otp = $auth->getOtpToVerifyMobile($userID);
         }
-        $otp = $auth->generateOTP($userID, $for);
 
         $title = urlencode("OTP sent to " . $postVerify);
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");

@@ -1,5 +1,6 @@
 <?php
 header("type: application/json");
+
 $time = microtime(true);
 require './class.FastAuth.php';
 require './class.FastAuthConstants.php';
@@ -15,7 +16,7 @@ $user = [
 ];
 
 try {
-    // $otp = $auth->createUserWithEmail('sam@gmail.com', '123456', 'Sam');
+    $otp = $auth->createUserWithEmail('sam@gmail.com', '123456', 'Sam');
     // print_r($otp); 
     // 477145
     // $res = $auth->verfiyCreatedUser('10002', '477145');

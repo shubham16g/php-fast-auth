@@ -7,7 +7,6 @@ if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 if (isset($_POST['submit'])) {
@@ -18,25 +17,26 @@ if (isset($_POST['submit'])) {
     $password = $_POST['password'];
     $countryCode = $_POST['countryCode'];
 
-    $userData;
-    if (is_numeric($emailOrMobile)) {
-        $userData = ['name' => $name, 'countryCode' => $countryCode, 'mobile' => $emailOrMobile, 'password' => $password];
-    } else {
-        $userData = ['name' => $name, 'email' => $emailOrMobile, 'password' => $password];
-    }
+    $resultArray;
     try {
-        $auth->createUser($userData);
-        $signInResult;
-        if (isset($userData['mobile'])) {
-            $signInResult = $auth->signInWithMobileAndPassword($countryCode, $emailOrMobile, $password);
+        if (is_numeric($emailOrMobile)) {
+            $resultArray = $auth->createUserWithMobile($countryCode, $emailOrMobile, $password, $name);
         } else {
-            $signInResult = $auth->signInWithEmailAndPassword($emailOrMobile, $password);
+            $resultArray = $auth->createUserWithEmail($emailOrMobile, $password, $name);
         }
-        $userID = $signInResult['userData']['userID'];
-        $token = $signInResult['tokenData']['token'];
 
-        $_SESSION['userID'] = $userID;
-        $_SESSION['token'] = $token;
+        /* $resultArray = [
+            'userID' => <int>,
+            'otp' => <string>
+        ] */
+
+        $userID = $resultArray['userID'];
+        $otp = $resultArray['otp'];
+
+        $title = urlencode("Verify Account, an OTP sent to $emailOrMobile");
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
+        $redirect = urlencode("verify_otp.php?uid=" . urlencode($userID) . "&for=" . urlencode(FastAuth::FOR_VERIFY_CREATED_ACCOUNT));
+        header("Location: message.php?title=$title&content=$content&redirect=$redirect");
 
         // header("Location: ./index.php");
     } catch (Exception $e) {
