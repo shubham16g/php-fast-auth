@@ -17,21 +17,17 @@ if (isset($_POST['submit'])) {
     $password = $_POST['password'];
     $countryCode = $_POST['countryCode'];
 
-    $resultArray;
+    $userID;
     try {
         if (is_numeric($emailOrMobile)) {
-            $resultArray = $auth->createUserWithMobile($countryCode, $emailOrMobile, $password, $name);
+            $userID = $auth->createUserWithMobile($countryCode, $emailOrMobile, $password, $name);
         } else {
-            $resultArray = $auth->createUserWithEmail($emailOrMobile, $password, $name);
+            $userID = $auth->createUserWithEmail($emailOrMobile, $password, $name);
         }
+        $otp = $auth->getOtpToRegisterUser($userID);
 
-        /* $resultArray = [
-            'userID' => <int>,
-            'otp' => <string>
-        ] */
-
-        $userID = $resultArray['userID'];
-        $otp = $resultArray['otp'];
+        /* send this otp to provided mobile or email
+        */
 
         $title = urlencode("Verify Account, an OTP sent to $emailOrMobile");
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
@@ -60,7 +56,9 @@ if (isset($_POST['submit'])) {
 
     <form action="" accept-charset="UTF-8" method="post" onsubmit="return validateForm(event);">
         <label for="name">Full Name</label>
-        <input type="text" name="name" id="name" class="input-block" autofocus="autofocus">
+        <div>
+            <input type="text" name="name" id="name" class="input-block" autofocus="autofocus" autocomplete="off">
+        </div>
 
         <label for="emailOrMobile">Email or Mobile Number</label>
         <div id="emailMobileContainer" class="input-block">

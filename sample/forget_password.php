@@ -5,7 +5,6 @@ if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
 
 $countryCodeList = ['+91', '+1', '+12', '+2'];
 
-require '../class.FastAuthConstants.php';
 require '../class.FastAuth.php';
 
 

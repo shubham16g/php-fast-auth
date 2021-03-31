@@ -1,5 +1,22 @@
 <?php
-require '../class.FastAuthConstants.php';
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+
+class FastAuthConstants
+{
+    public const DB_NAME = 'eleamapi';
+    public const SERVER_NAME = 'localhost';
+    public const USER_NAME = 'root';
+    public const PASSWORD = '';
+
+    public const OTP_LENGTH = 6;
+    public const OTP_CHARACTERS = '0123456789';
+    public const OTP_EXPIRES_IN = 3600;
+
+    public const TOKEN_EXPIRE_PERIOD = 2419200;
+    // public const OTP_CHARACTERS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+}
 
 class FastAuth
 {
@@ -8,19 +25,17 @@ class FastAuth
     const FOR_VERIFY_MOBILE = 6;
     const FOR_VERIFY_CREATED_ACCOUNT = 5;
 
-    const NOT_REGISTERED = -1;
-    const REGISTERED = 1;
-    const ANONYMOUS = 0;
-
-    private const TOKEN_EXPIRE_PERIOD = 2419200;
+    private const NOT_REGISTERED = -1;
+    private const REGISTERED = 1;
+    private const ANONYMOUS = 0;
 
     public function getUser(int $userID)
     {
-        return $this->_getPrivateUser('userID', $userID);
+        return $this->_getPrivateUser('*','userID', $userID);
     }
     public function getUserByMobileNumber(string $countryCode, string $mobile)
     {
-        $userData = $this->_getPrivateUser('mobile', $mobile);
+        $userData = $this->_getPrivateUser('*','mobile', $mobile);
         if ($userData['countryCode' !== $countryCode]) {
             throw new Exception("No user exists with this country code and mobile", 1);
         }
@@ -28,13 +43,13 @@ class FastAuth
     }
     public function getUserByEmail(string $email)
     {
-        return $this->_getPrivateUser('userID', $email);
+        return $this->_getPrivateUser('*', 'userID', $email);
     }
 
-    private function _getPrivateUser(string $key, string $value, bool $isAnySignedType = false)
+    private function _getPrivateUser(string $columns, string $key, string $value, bool $isAllSignedType = false)
     {
-        $query = "SELECT * FROM `fast_auth_users` WHERE `$key` = '$value'";
-        if (!$isAnySignedType) {
+        $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value'";
+        if (!$isAllSignedType) {
             $query .= " AND `signedType` = " . self::REGISTERED;
         }
         $res = mysqli_query($this->conn, $query);
@@ -50,21 +65,21 @@ class FastAuth
 
     public function isUserExist(int $userID)
     {
-        return $this->isUserExist('userID', $userID, false);
+        return $this->_isUserExist('userID', $userID);
     }
 
     // todo make it private
-    private function _isUserExist(string $key, string $value, bool $isAnySignedType = false)
+    private function _isUserExist(string $key, string $value, bool $isAllSignedType = false)
     {
         try {
-            $this->_getPrivateUser($key, $value, $isAnySignedType);
+            $this->_getPrivateUser('signedType', $key, $value, $isAllSignedType);
             return true;
         } catch (Exception $e) {
             return false;
         }
     }
 
-    private function parseUser(array $userArray = [])
+    private function parseUser(array $userArray)
     {
         return $userArray;
     }
@@ -97,7 +112,6 @@ class FastAuth
         `userID` INT(11) NOT NULL ,
         `createdAt` DATETIME NOT NULL ,
         `expiresIn` INT(11) NOT NULL ,
-        `expirePeriod` INT(11) NOT NULL ,
         `disabled` BOOLEAN NOT NULL default false ,
         `deviceID` VARCHAR(255) NULL ,
         `deviceName` VARCHAR(255) NULL ,
@@ -111,7 +125,6 @@ class FastAuth
         `otpHash` VARCHAR(255) NOT NULL ,
         `for` INT(11) NOT NULL ,
         `createdAt` DATETIME NOT NULL ,
-        `expiresIn` INT(11) NOT NULL default 3600,
         PRIMARY KEY (`id`)
         );";
 
@@ -132,31 +145,20 @@ class FastAuth
         return $this->_createUser(['countryCode' => $countryCode, 'mobile' => $mobile, 'mobileVerified' => 1], $password, $name, $profileURL, $extraJson, $userID);
     }
 
-    public function verifyCreatedUser(int $userID, string $otp)
-    {
-        $this->_verifyOTP($userID, $otp, self::FOR_VERIFY_CREATED_ACCOUNT);
-        $this->_clearOTP($userID, $otp, self::FOR_VERIFY_CREATED_ACCOUNT);
-        return $this->_updateUser($userID, ['signedType' => self::REGISTERED]);
-    }
-
     // todo forceCreateUserWith* Function
-
     private function _createUser(array $params, string $password, string $name, string $profileURL = null, array $extraJson = null, int $userID = null, int $signedType = self::NOT_REGISTERED)
     {
         $params['password'] = $password;
         $params['name'] = $name;
         $params['profileURL'] = $profileURL;
         $params['extraJson'] = $extraJson;
+        $params['signedType'] = $signedType;
         if ($userID == null) {
             $userID = $this->_insertUser($params);
         } else {
             $this->_updateUser($userID, $params);
         }
-        if ($signedType != self::NOT_REGISTERED) {
-            return $userID;
-        }
-        $otp = $this->_generateOTP($userID, self::FOR_VERIFY_CREATED_ACCOUNT);
-        return ['userID' => $userID, 'otp' => $otp];
+        return $userID;
     }
 
     private function _insertUser(array $params)
@@ -198,28 +200,27 @@ class FastAuth
 
     // **************************** SIGNIN PROCESS *-********************************----*******
 
-    public function signInAnonymously(int $tokenExpirePeriod = self::TOKEN_EXPIRE_PERIOD, string $deviceID = '', string $deviceType = '', string $deviceName = '')
+    public function signInAnonymously(array $deviceParams = null)
     {
         $userID = $this->_createUser([], '', 'anonymous', null, null, null, self::ANONYMOUS);
-        return $this->_tokenSignIn($userID, false, $tokenExpirePeriod, $deviceID, $deviceType, $deviceName);
+        return $this->_tokenSignIn($userID, false, $deviceParams);
     }
-    public function signInWithEmailAndPassword(string $email, string $password,  int $tokenExpirePeriod = self::TOKEN_EXPIRE_PERIOD, string $deviceID = '', string $deviceType = '', string $deviceName = '')
+    public function signInWithEmailAndPassword(string $email, string $password, array $deviceParams = null)
     {
-        return $this->_signIn('email', $email, $password, $deviceID, $deviceType, $deviceName, $tokenExpirePeriod);
+        return $this->_signIn('email', $email, $password, $deviceParams);
     }
-    public function signInWithMobileAndPassword(string $countryCode, string $mobile, string $password,  int $tokenExpirePeriod = self::TOKEN_EXPIRE_PERIOD, string $deviceID = '', string $deviceType = '', string $deviceName = '')
+    public function signInWithMobileAndPassword(string $countryCode, string $mobile, string $password, array $deviceParams = null)
     {
-        return $this->_signIn('mobile', $mobile, $password, $deviceID, $deviceType, $deviceName, $tokenExpirePeriod, $countryCode);
+        return $this->_signIn('mobile', $mobile, $password, $deviceParams, $countryCode);
     }
+    public function forceSignIn(int $userID, array $deviceParams = null)
+    {
+        return $this->_signIn('userID', $userID, '', $deviceParams, null, true);
+    }
+    private function _signIn(string $key, string $value, string $password, array $deviceParams = null, string $countryCode = null, bool $isForced = false)
+    {
 
-    public function forceSignIn(int $userID, int $tokenExpirePeriod = self::TOKEN_EXPIRE_PERIOD, string $deviceID = '', string $deviceType = '', string $deviceName = '')
-    {
-        return $this->_signIn('userID', $userID, '', $deviceID, $deviceType, $deviceName, $tokenExpirePeriod, null, true);
-    }
-
-    private function _signIn(string $key, string $value, string $password, string $deviceID, string $deviceType, string $deviceName, int $expirePeriod, string $countryCode = null, bool $isForced = false)
-    {
-        $userArray = $this->_getPrivateUser($key, $value);
+        $userArray = $this->_getPrivateUser('countryCode, passwordHash, userID, disabled', $key, $value);
         if ($userArray == null) {
             throw new Exception("No user Exists with this $key", 1);
         } elseif (!$isForced && $countryCode != null && $userArray['countryCode'] !== $countryCode) {
@@ -229,16 +230,25 @@ class FastAuth
         } elseif ($userArray['disabled'] == 1) {
             throw new Exception("This user is disabled", 1);
         } else {
-            return $this->_tokenSignIn($userArray['userID'], true, $expirePeriod, $deviceID, $deviceType, $deviceName);
+            return $this->_tokenSignIn($userArray['userID'], true, $deviceParams);
         }
     }
 
-    private function _tokenSignIn(int $userID, bool $isSigned, int $expirePeriod, string $deviceID, string $deviceType, string $deviceName)
+    private function _tokenSignIn(int $userID, bool $isSigned, array $deviceParams = null)
     {
+        $deviceID = '';
+        $deviceType = '';
+        $deviceName = '';
+        if ($deviceParams) {
+            $deviceID = isset($deviceParams['deviceID']) ? $deviceParams['deviceID'] : '';
+            $deviceType = isset($deviceParams['deviceType']) ? $deviceParams['deviceType'] : '';
+            $deviceName = isset($deviceParams['deviceName']) ? $deviceParams['deviceName'] : '';
+        }
         $token = $this->randStr();
         $currentTime = $this->getCurrentTimeForMySQL();
-        $query = "INSERT INTO `fast_auth_tokens` (`token`,`userID`,`deviceID`,`deviceType`,`deviceName`, `createdAt`, `expiresIn`, `expirePeriod`) VALUES
-        ('$token', '$userID', '$deviceID', '$deviceType', '$deviceName', '$currentTime' , '$expirePeriod', '$expirePeriod')";
+        $expirePeriod = FastAuthConstants::TOKEN_EXPIRE_PERIOD;
+        $query = "INSERT INTO `fast_auth_tokens` (`token`,`userID`,`deviceID`,`deviceType`,`deviceName`, `createdAt`, `expiresIn`) VALUES
+        ('$token', '$userID', '$deviceID', '$deviceType', '$deviceName', '$currentTime' , '$expirePeriod')";
 
         if (!mysqli_query($this->conn, $query)) {
             throw new Exception("DB Error", 1);
@@ -254,6 +264,11 @@ class FastAuth
 
     public function getOtpToResetPassword(int $userID)
     {
+
+        $userData = $this->_getPrivateUser('disabled', 'userID', $userID);
+        if ($userData['disabled'] == 1) {
+            throw new Exception("This user is disabled", 1);
+        }
         return $this->_generateOTP($userID, self::FOR_RESET_PASSWORD);
     }
 
@@ -266,15 +281,17 @@ class FastAuth
     {
         return $this->_generateOTP($userID, self::FOR_VERIFY_MOBILE);
     }
-
-    private function _generateRandomOTP()
+    
+    public function getOtpToRegisterUser(int $userID)
     {
-        $charactersLength = strlen(FastAuthConstants::OTP_CHARACTERS);
-        $randomString = '';
-        for ($i = 0; $i < FastAuthConstants::OTP_LENGTH; $i++) {
-            $randomString .= FastAuthConstants::OTP_CHARACTERS[rand(0, $charactersLength - 1)];
-        }
-        return $randomString;
+        return $this->_generateOTP($userID, self::FOR_VERIFY_CREATED_ACCOUNT);
+    }
+
+    public function verifyRegisterUser(int $userID, string $otp)
+    {
+        $this->_verifyOTP($userID, $otp, self::FOR_VERIFY_CREATED_ACCOUNT);
+        $this->_clearOTP($userID, $otp, self::FOR_VERIFY_CREATED_ACCOUNT);
+        return $this->_updateUser($userID, ['signedType' => self::REGISTERED]);
     }
 
     // if (!$this->_isUserExist('userID', $userID)) {
@@ -285,10 +302,9 @@ class FastAuth
         $otp = $this->_generateRandomOTP();
         $otpHash = $this->cryptOTP($otp);
         $currentTime = $this->getCurrentTimeForMySQL();
-        $expiresIn = FastAuthConstants::OTP_EXPIRES_IN;
 
-        $query = "INSERT INTO `fast_auth_otps` (`userID`,`otpHash`,`for`,`createdAt`,`expiresIn`) VALUES
-        ('$userID', '$otpHash', '$for', '$currentTime', '$expiresIn')";
+        $query = "INSERT INTO `fast_auth_otps` (`userID`,`otpHash`,`for`,`createdAt`) VALUES
+        ('$userID', '$otpHash', '$for', '$currentTime')";
 
         if (!mysqli_query($this->conn, $query)) {
             throw new Exception("Error in generating OTP", 1);
@@ -299,7 +315,7 @@ class FastAuth
     private function _verifyOTP(int $userID, string $otp, int $for)
     {
         $otpHash = $this->cryptOTP($otp);
-        $query = "SELECT `createdAt`, `expiresIn` FROM `fast_auth_otps` WHERE 
+        $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE 
         `userID` = '$userID' AND
         `otpHash` = '$otpHash' AND
         `for` = '$for'";
@@ -308,7 +324,7 @@ class FastAuth
             throw new Exception("Invalid OTP", 1);
         }
         if ($row = mysqli_fetch_assoc($res)) {
-            if (!$this->isValidTimePeriod($row['createdAt'], $row['expiresIn'])) {
+            if (!$this->isValidTimePeriod($row['createdAt'], FastAuthConstants::OTP_EXPIRES_IN)) {
                 throw new Exception("Timeout! OTP Expires", 1);
             }
             return true;
@@ -325,6 +341,16 @@ class FastAuth
         `otpHash` = '$otpHash' AND
         `for` = '$for'";
         mysqli_query($this->conn, $query);
+    }
+
+    private function _generateRandomOTP()
+    {
+        $charactersLength = strlen(FastAuthConstants::OTP_CHARACTERS);
+        $randomString = '';
+        for ($i = 0; $i < FastAuthConstants::OTP_LENGTH; $i++) {
+            $randomString .= FastAuthConstants::OTP_CHARACTERS[rand(0, $charactersLength - 1)];
+        }
+        return $randomString;
     }
 
     // *************************************** User Edits ***********-******-*-*--*-**********
@@ -346,7 +372,7 @@ class FastAuth
         $this->_clearOTP($userID, $otp, self::FOR_VERIFY_MOBILE);
         return $this->forceVerifyMobile($userID);
     }
-    public function isValidOtpToResetPassword(int $userID, int $otp)
+    public function verifyResetPassword(int $userID, int $otp)
     {
         return $this->_verifyOTP($userID, $otp, self::FOR_RESET_PASSWORD);
     }
@@ -451,7 +477,7 @@ class FastAuth
             } elseif ($row['disabled']) {
                 throw new Exception("Token disabled", 1);
             } else {
-                $timeGap = $timeGap + $row['expirePeriod'];
+                $timeGap = $timeGap + FastAuthConstants::TOKEN_EXPIRE_PERIOD;
                 $q2 = "UPDATE `fast_auth_tokens` SET `expiresIn` = '$timeGap' WHERE `token` = '$token' AND `userID` = '$userID'";
                 mysqli_query($this->conn, $q2);
                 return $token;

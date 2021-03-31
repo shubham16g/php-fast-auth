@@ -2,15 +2,18 @@
 session_start();
 require '../class.FastAuth.php';
 
-if (isset($_POST['submit'])) {
-    $otp = $_POST['otp'];
-    $for = $_GET['for'];
-    $userID = $_GET['uid'];
+if (!isset($_GET['for']) && !isset($_GET['uid'])) {
+    die('Error');
+}
+$for = $_GET['for'];
+$userID = $_GET['uid'];
+$auth = new FastAuth();
 
-    $auth = new FastAuth();
-    try {
+try {
+    if (isset($_POST['submit'])) {
+        $otp = $_POST['otp'];
         if ($for == FastAuth::FOR_RESET_PASSWORD) {
-            $auth->isValidOtpToResetPassword($userID, $otp);
+            $auth->verifyResetPassword($userID, $otp);
             header("Location: reset_password.php?uid=$userID&otp=$otp");
         } else {
             $title = '';
@@ -23,7 +26,7 @@ if (isset($_POST['submit'])) {
                 $auth->verifyEmail($userID, $otp);
                 $title = "Email verification successful";
             } elseif ($for == FastAuth::FOR_VERIFY_CREATED_ACCOUNT) {
-                $auth->verifyCreatedUser($userID, $otp);
+                $auth->verifyRegisterUser($userID, $otp);
 
                 $signInResult = $auth->forceSignIn($userID);
                 /* $signInResult = [
@@ -34,15 +37,22 @@ if (isset($_POST['submit'])) {
                 $_SESSION['userID'] = $signInResult['userID'];
                 $_SESSION['token'] = $signInResult['token'];
                 $_SESSION['isSigned'] = $signInResult['isSigned'];
-                $content = json_encode($signInResult);
+                // $content = json_encode($signInResult);
                 $title = "Account verification successful";
             }
             header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
         }
-    } catch (Exception $e) {
-        die($e->getMessage());
+    } elseif (isset($_POST['resend'])) {
+        header("Location: generate_otp.php?resend=1&uid=" . urlencode($userID) . "&for=" . urlencode($for));
+        
     }
+} catch (Exception $e) {
+    die($e->getMessage());
 }
+
+
+
+
 ?>
 
 <!DOCTYPE html>
@@ -61,6 +71,7 @@ if (isset($_POST['submit'])) {
         <input type="number" name="otp" id="otp" class="input-block" autofocus="autofocus" maxlength="6" minlength="6">
 
         <input type="submit" name="submit" value="Verify OTP" class="btn">
+        <input type="submit" name="resend" value="Resend OTP" class="btn">
     </form>
 
     <script>

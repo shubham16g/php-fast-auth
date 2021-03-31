@@ -58,8 +58,6 @@ if (isset($_POST['submit'])) {
 
     <form action="" autocomplete="off" accept-charset="UTF-8" method="post" onsubmit="return validateForm(event);">
 
-        <input type="password" style="opacity: 0;position: absolute;">
-
         <label for="emailOrMobile">Email or Mobile Number</label>
         <div id="emailMobileContainer" class="input-block">
             <select name="countryCode" class="input-block cc-block" id="countryCode">
