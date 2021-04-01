@@ -3,7 +3,7 @@ session_start();
 
 $countryCodeList = ['+91', '+1', '+12', '+2'];
 
-if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
+if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
@@ -31,10 +31,10 @@ if (isset($_POST['submit'])) {
         } else {
             $signInResult = $auth->signInWithEmailAndPassword($emailOrMobile, $password);
         }
-        $userID = $signInResult['userID'];
+        $uid = $signInResult['uid'];
         $token = $signInResult['token'];
 
-        $_SESSION['userID'] = $userID;
+        $_SESSION['uid'] = $uid;
         $_SESSION['token'] = $token;
 
         header("Location: ./index.php");

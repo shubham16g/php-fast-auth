@@ -2,49 +2,56 @@
 session_start();
 require '../class.FastAuth.php';
 
-if (!isset($_GET['for']) && !isset($_GET['uid'])) {
+if (!isset($_GET['key'])) {
     die('Error');
 }
-$for = $_GET['for'];
-$userID = $_GET['uid'];
+$key = $_GET['key'];
 $auth = new FastAuth();
 
 try {
     if (isset($_POST['submit'])) {
-        $otp = $_POST['otp'];
-        if ($for == FastAuth::FOR_RESET_PASSWORD) {
-            $auth->verifyResetPassword($userID, $otp);
-            header("Location: reset_password.php?uid=$userID&otp=$otp");
-        } else {
-            $title = '';
-            $content = '';
-            $redirect = 'index.php';
-            if ($for == FastAuth::FOR_VERIFY_MOBILE) {
-                $auth->verifyMobile($userID, $otp);
-                $title = "Mobile number verification successful";
-            } elseif ($for == FastAuth::FOR_VERIFY_EMAIL) {
-                $auth->verifyEmail($userID, $otp);
-                $title = "Email verification successful";
-            } elseif ($for == FastAuth::FOR_VERIFY_CREATED_ACCOUNT) {
-                $auth->verifyRegisterUser($userID, $otp);
 
-                $signInResult = $auth->forceSignIn($userID);
-                /* $signInResult = [
-                    'userID' => <int>,
-                    'token' => <string>,
-                    'isSigned' => <bool>
-                ] */
-                $_SESSION['userID'] = $signInResult['userID'];
+        $title = '';
+        $content = '';
+        $redirect = 'index.php';
+
+        $otp = $_POST['otp'];
+        $result = $auth->verifyOTP($key, $otp);
+
+        switch ($result['case']) {
+            case FastAuth::CASE_UPDATE_PASSWORD:
+                $passwordUpdateKey = $result['passwordUpdateKey'];
+                header("Location: reset_password.php?passwordUpdateKey=" . urlencode($passwordUpdateKey));
+                die();
+                break;
+            case FastAuth::CASE_NEW_USER:
+                $uid = $result['uid'];
+                $signInResult = $auth->signInWithUid($uid);
+                $_SESSION['uid'] = $signInResult['uid'];
                 $_SESSION['token'] = $signInResult['token'];
-                $_SESSION['isSigned'] = $signInResult['isSigned'];
+                $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
                 // $content = json_encode($signInResult);
                 $title = "Account verification successful";
-            }
-            header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
+                break;
+            case FastAuth::CASE_UPDATE_EMAIL:
+                $title = "Email update successful";
+                break;
+            case FastAuth::CASE_UPDATE_MOBILE:
+                $title = "Mobile number update successful";
+                break;
+            default:
+                throw new Exception("Error in verify_otp.php: no such case", 1);
+                break;
         }
+
+        header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
+
     } elseif (isset($_POST['resend'])) {
-        header("Location: generate_otp.php?resend=1&uid=" . urlencode($userID) . "&for=" . urlencode($for));
-        
+        $newOtp = $auth->generateOTP($key);/* 
+        $title = urlencode("OTP re-sent to $emailOrMobile");
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
+        $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
+        header("Location: message.php?title=$title&content=$content&redirect=$redirect"); */
     }
 } catch (Exception $e) {
     die($e->getMessage());
@@ -68,7 +75,7 @@ try {
 
     <form action="" accept-charset="UTF-8" method="post" onsubmit="return validateForm(event);">
         <label for="otp">Enter OTP</label>
-        <input type="number" name="otp" id="otp" class="input-block" autofocus="autofocus" maxlength="6" minlength="6">
+        <input type="text" name="otp" id="otp" class="input-block" autofocus="autofocus" maxlength="6" minlength="6">
 
         <input type="submit" name="submit" value="Verify OTP" class="btn">
         <input type="submit" name="resend" value="Resend OTP" class="btn">

@@ -3,14 +3,14 @@
 if (!isset($_GET['uid'])) {
     echo 'error';
 }
-$userID = $_GET['uid'];
+$uid = $_GET['uid'];
 
 require '../class.FastAuth.php';
 
 $auth = new FastAuth();
 $userData;
 try {
-    $userData = $auth->getUser($userID);
+    $userData = $auth->getUser($uid);
 } catch (Exception $e) {
     die($e->getMessage());
 }
@@ -28,14 +28,14 @@ if (isset($_POST['submit'])) {
         $postVerify = $_POST['toVerify'];
         $otp;
         if (strpos($postVerify, '@')) { //email contain @, you can do you own logic
-            $otp = $auth->getOtpToVerifyEmail($userID);
+            $otp = $auth->getOtpToVerifyEmail($uid);
         } else {
-            $otp = $auth->getOtpToVerifyMobile($userID);
+            $otp = $auth->getOtpToVerifyMobile($uid);
         }
 
         $title = urlencode("OTP sent to " . $postVerify);
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
-        $redirect = urlencode("verify_otp.php?uid=" . urlencode($userID) . "&for=" . urlencode($for));
+        $redirect = urlencode("verify_otp.php?uid=" . urlencode($uid) . "&for=" . urlencode($for));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         die();
     } catch (Exception $e) {

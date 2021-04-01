@@ -3,7 +3,7 @@ session_start();
 
 $countryCodeList = ['+91', '+1', '+12', '+2'];
 
-if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
+if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
@@ -17,23 +17,22 @@ if (isset($_POST['submit'])) {
     $password = $_POST['password'];
     $countryCode = $_POST['countryCode'];
 
-    $userID;
+    $key;
     try {
         if (is_numeric($emailOrMobile)) {
-            $userID = $auth->createUserWithMobile($countryCode, $emailOrMobile, $password, $name);
+            $key = $auth->requestNewUserWithMobile($countryCode, $emailOrMobile, $password, $name);
         } else {
-            $userID = $auth->createUserWithEmail($emailOrMobile, $password, $name);
+            $key = $auth->requestNewUserWithEmail($emailOrMobile, $password, $name);
         }
-        $otp = $auth->getOtpToRegisterUser($userID);
+        $otp = $auth->generateOTP($key);
 
         /* send this otp to provided mobile or email
         */
 
-        $title = urlencode("Verify Account, an OTP sent to $emailOrMobile");
+        $title = urlencode("OTP sent to $emailOrMobile");
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
-        $redirect = urlencode("verify_otp.php?uid=" . urlencode($userID) . "&for=" . urlencode(FastAuth::FOR_VERIFY_CREATED_ACCOUNT));
+        $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
-
         // header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();

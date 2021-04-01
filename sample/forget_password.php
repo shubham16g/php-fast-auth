@@ -1,5 +1,5 @@
 <?php
-if (isset($_SESSION['userID']) && isset($_SESSION['token'])) {
+if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
@@ -21,12 +21,14 @@ if (isset($_POST['submit'])) {
         } else {
             $userData = $auth->getUserByEmail($emailOrMobile);
         }
-        $userID = $userData['userID'];
-        $otp = $auth->getOtpToResetPassword($userID);
+        $uid = $userData['uid'];
+        $key = $auth->requestUpdatePassword($uid);
+
+        $otp = $auth->generateOTP($key);
 
         $title = urlencode("OTP sent to $emailOrMobile");
         $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
-        $redirect = urlencode("verify_otp.php?uid=" . urlencode($userID) . "&for=" . urlencode(FastAuth::FOR_RESET_PASSWORD));
+        $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         die();
     } catch (Exception $e) {

@@ -2,7 +2,7 @@
 
 session_start();
 
-if (!isset($_SESSION['userID']) || !isset($_SESSION['token'])) {
+if (!isset($_SESSION['uid']) || !isset($_SESSION['token'])) {
     header("Location: signin.php");
 }
 require '../class.FastAuth.php';
@@ -11,9 +11,9 @@ $auth = new FastAuth();
 
 $userJson;
 try {
-    $userID = $_SESSION['userID'];
-    $auth->verifyUser($userID, $_SESSION['token']);
-    $userData = $auth->getUser($userID);
+    $uid = $_SESSION['uid'];
+    $auth->verifyUser($uid, $_SESSION['token']);
+    $userData = $auth->getUser($uid);
 
     $userJson = json_encode($userData, JSON_PRETTY_PRINT);
 } catch (Exception $e) {

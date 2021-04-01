@@ -1,22 +1,21 @@
 <?php
-if (!isset($_GET['uid'])) {
-    header("Location: ./index.php");
+$withKey = false;
+if (isset($_GET['passwordUpdateKey'])) {
+    $withKey = true;
 }
-$userID = $_GET['uid'];
-$withOTP = false;
 
 require '../class.FastAuth.php';
 
 $auth = new FastAuth();
 
 if (isset($_POST['submit'])) {
-    if (isset($_POST['oldPassword'])) {
+    if (isset($_POST['currentPassword'])) {
         // todo
-    } elseif (isset($_GET['otp'])) {
-        $otp = $_GET['otp'];
+    } elseif (isset($_GET['passwordUpdateKey'])) {
+        $passwordUpdateKey = $_GET['passwordUpdateKey'];
         try {
-            $auth->resetPasswordWithOTP($userID, $_POST['password'], $otp);
-            $auth->signOutAllDevices($userID);
+            $auth->updatePassword($passwordUpdateKey, $_POST['password']);
+            // $auth->signOutAllDevices($uid);
 
             $title = urlencode("Password Reset Successful");
             $content = urlencode("You can now sign in with your new password.");
@@ -29,15 +28,6 @@ if (isset($_POST['submit'])) {
         echo "Error";
     }
     die();
-}
-
-if (isset($_GET['otp'])) {
-    $otp = $_GET['otp'];
-    try {
-        $withOTP = $auth->isValidOtpToResetPassword($userID, $otp); //return bool
-    } catch (Exception $e) {
-        die($e->getMessage());
-    }
 }
 
 ?>
@@ -56,7 +46,7 @@ if (isset($_GET['otp'])) {
 
     <form action="" accept-charset="UTF-8" method="post" onsubmit="return validateForm(event);">
         <?php
-        if (!$withOTP) {
+        if (!$withKey) {
         ?>
             <label for="oldPassword">Old Password</label>
             <input type="password" name="oldPassword" id="oldPassword" class="input-block">
@@ -76,7 +66,7 @@ if (isset($_GET['otp'])) {
         function validateForm(event) {
             var formData = new FormData(event.target);
             <?php
-            if (!$withOTP) {
+            if (!$withKey) {
             ?>
                 const oldPassword = formData.get('oldPassword');
                 if (oldPassword === '') {
