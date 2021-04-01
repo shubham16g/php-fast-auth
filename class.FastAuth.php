@@ -45,7 +45,6 @@ class FastAuth
         $createUsersTable = "CREATE TABLE IF NOT EXISTS `fast_auth_users` (
         `uid` VARCHAR(255) NOT NULL ,
         `email` VARCHAR(255) NULL ,
-        `countryCode` VARCHAR(5) NULL ,
         `mobile` VARCHAR(255) NULL ,
         `passwordHash` VARCHAR(255) NULL ,
         `name` VARCHAR(255) NULL ,
@@ -102,12 +101,12 @@ class FastAuth
         }
         return $this->_newTempUser(['email' => $email], $password, $name, $profileURL, $extraJson, $uid);
     }
-    public function requestNewUserWithMobile(string $countryCode, string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null)
+    public function requestNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null)
     {
         if ($this->_isUserExist('email', $mobile)) {
             throw new Exception("A user alerady exists with same mobile", 3);
         }
-        return $this->_newTempUser(['countryCode' => $countryCode, 'mobile' => $mobile], $password, $name, $profileURL, $extraJson, $uid);
+        return $this->_newTempUser(['mobile' => $mobile], $password, $name, $profileURL, $extraJson, $uid);
     }
 
     public function generateOTP(string $key)
@@ -160,9 +159,9 @@ class FastAuth
     {
         return $this->_signIn('email', $email, $password, $deviceJson);
     }
-    public function signInWithMobileAndPassword(string $countryCode, string $mobile, string $password, array $deviceJson = null)
+    public function signInWithMobileAndPassword(string $mobile, string $password, array $deviceJson = null)
     {
-        return $this->_signIn('mobile', $mobile, $password, $deviceJson, $countryCode);
+        return $this->_signIn('mobile', $mobile, $password, $deviceJson);
     }
     public function signInWithUid(string $uid, array $deviceJson = null)
     {
@@ -178,13 +177,10 @@ class FastAuth
     {
         return $this->_isUserExist('uid', $uid);
     }
-    public function getUserByMobileNumber(string $countryCode, string $mobile)
+    public function getUserByMobileNumber(string $mobile)
     {
-        $userData = $this->_getPrivateUser('*', 'mobile', $mobile);
-        if ($userData['countryCode']!== $countryCode) {
-            throw new Exception("No user exists with this country code and mobile", 1);
-        }
-        return $userData;
+        return $this->_getPrivateUser('*', 'mobile', $mobile);
+        
     }
     public function getUserByEmail(string $email)
     {
@@ -193,9 +189,9 @@ class FastAuth
 
     // *************************************** User Edits ***********-******-*-*--*-**********
 
-    public function requestUpdateMobile(string $uid, string $newCountryCode, string $newMobile)
+    public function requestUpdateMobile(string $uid, string $newMobile)
     {
-        return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['countryCode' => $newCountryCode, 'mobile' => $newMobile], true);
+        return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['mobile' => $newMobile], true);
     }
 
     public function requestUpdateEmail(string $uid, string $newEmail)
@@ -444,13 +440,11 @@ class FastAuth
             throw new Exception("DB Error", 1);
         }
     }
-    private function _signIn(string $key, string $value, string $password = null, array $deviceJson = null, string $countryCode = null)
+    private function _signIn(string $key, string $value, string $password = null, array $deviceJson = null)
     {
-        $userArray = $this->_getPrivateUser('countryCode, passwordHash, uid, disabled', $key, $value);
+        $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', $key, $value);
         if ($userArray == null) {
             throw new Exception("No user Exists with this $key", 1);
-        } elseif ($key !== 'uid' && $countryCode != null && $userArray['countryCode'] !== $countryCode) {
-            throw new Exception("Incorrect country code", 1);
         } elseif ($key !== 'uid' && !password_verify($password, $userArray['passwordHash'])) {
             throw new Exception("Incorrect Password", 1);
         } elseif ($userArray['disabled'] == 1) {

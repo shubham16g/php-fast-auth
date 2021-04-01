@@ -10,16 +10,14 @@ require '../class.FastAuth.php';
 
 
 if (isset($_POST['submit'])) {
-    $emailOrMobile = $_POST['emailOrMobile'];
-    $countryCode = $_POST['countryCode'];
 
     $auth = new FastAuth();
     try {
         $userData;
-        if (is_numeric($emailOrMobile)) {
-            $userData = $auth->getUserByMobileNumber($countryCode, $emailOrMobile);
+        if (isset($_POST['mobile'])) {
+            $userData = $auth->getUserByMobileNumber($_POST['mobile']);
         } else {
-            $userData = $auth->getUserByEmail($emailOrMobile);
+            $userData = $auth->getUserByEmail($_POST['email']);
         }
         $uid = $userData['uid'];
         $key = $auth->requestUpdatePassword($uid);
@@ -70,11 +68,25 @@ if (isset($_POST['submit'])) {
         }
 
         function validateForm(event) {
-            var formData = new FormData(event.target);
-            const emailOrMobile = formData.get('emailOrMobile');
-            if (!validateEmailOrMobile(emailOrMobile)) {
+            const form = event.target;
+            const emailOrMobile = form.emailOrMobile.value;
+
+            var isMobile = false;
+            handleEmailOrMobile(emailOrMobile, (b) => {
+                isMobile = b;
+            }, (errorCode, message) => {
+                alert(message);
                 return false;
+            });
+
+            /* eveything is now fine */
+            if (isMobile) {
+                form.emailOrMobile.name = 'mobile';
+                form.mobile.value = form.countryCode.value + emailOrMobile;
+            } else {
+                form.emailOrMobile.name = 'email';
             }
+            form.countryCode.remove();
             return true;
         }
     </script>

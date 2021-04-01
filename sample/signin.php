@@ -12,31 +12,23 @@ require '../class.FastAuth.php';
 if (isset($_POST['submit'])) {
     $auth = new FastAuth();
 
-    $emailOrMobile = $_POST['emailOrMobile'];
     $password = $_POST['password'];
-    $countryCode = $_POST['countryCode'];
 
     // todo validate these post methods
 
-    $enteredType;
-    if (is_numeric($emailOrMobile)) {
-        $enteredType = 'mobile';
-    } else {
-        $enteredType = 'email';
-    }
     try {
         $signInResult;
-        if ($enteredType === 'mobile') {
-            $signInResult = $auth->signInWithMobileAndPassword($countryCode, $emailOrMobile, $password);
+        if (isset($_POST['mobile'])) {
+            $signInResult = $auth->signInWithMobileAndPassword($_POST['mobile'], $password);
         } else {
-            $signInResult = $auth->signInWithEmailAndPassword($emailOrMobile, $password);
+            $signInResult = $auth->signInWithEmailAndPassword($_POST['email'], $password);
         }
-        $uid = $signInResult['uid'];
-        $token = $signInResult['token'];
 
-        $_SESSION['uid'] = $uid;
-        $_SESSION['token'] = $token;
+        $_SESSION['uid'] = $signInResult['uid'];
+        $_SESSION['token'] = $signInResult['token'];
+        $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
 
+        header("Location: ../test.php");
         header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();
@@ -86,13 +78,17 @@ if (isset($_POST['submit'])) {
         }
 
         function validateForm(event) {
-            var formData = new FormData(event.target);
-            const emailOrMobile = formData.get('emailOrMobile');
-            const password = formData.get('password');
+            const form = event.target;
+            const emailOrMobile = form.emailOrMobile.value;
+            const password = form.password.value;
 
-            if (!validateEmailOrMobile(emailOrMobile)) {
+            var isMobile = false;
+            handleEmailOrMobile(emailOrMobile, (b) => {
+                isMobile = b;
+            }, (errorCode, message) => {
+                alert(message);
                 return false;
-            }
+            });
 
             if (password === '') {
                 alert("Please enter password");
@@ -103,6 +99,14 @@ if (isset($_POST['submit'])) {
                 return false;
             }
 
+            /* eveything is now fine */
+            if (isMobile) {
+                form.emailOrMobile.name = 'mobile';
+                form.mobile.value = form.countryCode.value + emailOrMobile;
+            } else {
+                form.emailOrMobile.name = 'email';
+            }
+            form.countryCode.remove();
             return true;
         }
     </script>

@@ -1,4 +1,4 @@
-const intRegex = /[0-9 -()+]+$/;    
+const intRegex = /[0-9 -()+]+$/g;
 function validateEmailOrMobile(emailOrMobile) {
     if (emailOrMobile === '') {
         alert("Please enter a valid email or mobile number");
@@ -12,7 +12,7 @@ function validateEmailOrMobile(emailOrMobile) {
         }
         return true;
     } else {
-        
+
         var emailReg = /^([w-.]+@([w-]+.)+[w-]{2,4})?$/;
         // email entered
         if (!emailReg.test(emailOrMobile)) {
@@ -23,12 +23,37 @@ function validateEmailOrMobile(emailOrMobile) {
     }
 }
 
+
+function handleEmailOrMobile(emailOrMobile, successCallback, errorCallback) {
+    if (emailOrMobile === '') {
+        errorCallback(1, "Please enter a valid email or mobile number");
+        return;
+    }
+    if (!isNaN(emailOrMobile) && !isNaN(parseFloat(emailOrMobile))) {
+        // mobile number entered
+        if (emailOrMobile.length != 10) {
+            errorCallback(2, 'Please enter a valid 10-digit mobile number.');
+        } else {
+            successCallback(true);
+        }
+    } else {
+
+        var reg = /^([A-Za-z0-9_\-\.])+\@([A-Za-z0-9_\-\.])+\.([A-Za-z]{2,4})$/;
+        // email entered
+        if (!reg.test(emailOrMobile)) {
+            errorCallback(3, 'Please enter a valid email address.' + emailOrMobile);
+        } else {
+            successCallback(false);
+        }
+    }
+}
+
 function handleCountryCodeVisibility(countryCode, emailOrMobile) {
     const cc = document.getElementById(countryCode);
     const em = document.getElementById(emailOrMobile);
     em.oninput = callback;
     // em.onchange = callback;
-    
+
     setTimeout(() => {
         em.style.visibility = 'visible';
         em.value = ''
@@ -39,11 +64,15 @@ function handleCountryCodeVisibility(countryCode, emailOrMobile) {
     }
     function action(value) {
         console.log(value);
-        if (intRegex.test(em.value)) {
+        if (!isNaN(value) && !isNaN(parseFloat(value))) {
             cc.style.display = 'block';
         } else {
             cc.style.display = 'none';
         }
     }
-    
+
+    function appendInvisibleInputToForm(form, name, value) {
+        
+    }
+
 }

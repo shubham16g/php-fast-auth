@@ -13,16 +13,14 @@ if (isset($_POST['submit'])) {
     $auth = new FastAuth();
 
     $name = $_POST['name'];
-    $emailOrMobile = $_POST['emailOrMobile'];
     $password = $_POST['password'];
-    $countryCode = $_POST['countryCode'];
 
     $key;
     try {
-        if (is_numeric($emailOrMobile)) {
-            $key = $auth->requestNewUserWithMobile($countryCode, $emailOrMobile, $password, $name);
+        if (isset($_POST['mobile'])) {
+            $key = $auth->requestNewUserWithMobile($_POST['mobile'], $password, $name);
         } else {
-            $key = $auth->requestNewUserWithEmail($emailOrMobile, $password, $name);
+            $key = $auth->requestNewUserWithEmail($_POST['email'], $password, $name);
         }
         $otp = $auth->generateOTP($key);
 
@@ -88,20 +86,26 @@ if (isset($_POST['submit'])) {
         }
 
         function validateForm(event) {
-            var formData = new FormData(event.target);
-            const name = formData.get('name');
-            const emailOrMobile = formData.get('emailOrMobile');
-            const password = formData.get('password');
-            const confirmPassword = formData.get('confirmPassword');
+            const form = event.target;
+
+            const name = form.name.value;
+            const emailOrMobile = form.emailOrMobile.value;
+            const password = form.password.value;
+            const confirmPassword = form.confirmPassword.value;
+
 
             if (name === '') {
                 alert("Please enter your full name.");
                 return false;
             }
 
-            if (!validateEmailOrMobile(emailOrMobile)) {
+            var isMobile = false;
+            handleEmailOrMobile(emailOrMobile, (b) => {
+                isMobile = b;
+            }, (errorCode, message) => {
+                alert(message);
                 return false;
-            }
+            });
 
             if (password === '') {
                 alert("Please enter password");
@@ -119,6 +123,15 @@ if (isset($_POST['submit'])) {
                 alert("Password doesn't match");
                 return false;
             }
+
+            /* eveything is now fine */
+            if (isMobile) {
+                form.emailOrMobile.name = 'mobile';
+                form.mobile.value = form.countryCode.value + emailOrMobile;
+            } else {
+                form.emailOrMobile.name = 'email';
+            }
+            form.countryCode.remove();
 
             return true;
 

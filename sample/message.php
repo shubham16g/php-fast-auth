@@ -26,7 +26,7 @@ if (isset($_GET['duration'])) {
             left: 0;
             transform: translateX(-100vw);
             height: 5px;
-            transition: all <?= $duration?>ms linear;
+            transition: all <?= $duration ?>ms linear;
         }
     </style>
 </head>
@@ -60,7 +60,7 @@ if (isset($_GET['duration'])) {
             document.querySelector('.p-bar').style.transform = 'translateX(0)';
         }
 
-        
+
         function printTimeout() {
             var second = parseInt(duration / 1000);
             red.innerHTML = `Redirect in ${second} seconds!`;
