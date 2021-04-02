@@ -6,6 +6,7 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
 $countryCodeList = ['+91', '+1', '+12', '+2'];
 
 require '../class.FastAuth.php';
+require '../class.FastAuthConstants.php';
 
 
 
@@ -13,19 +14,22 @@ if (isset($_POST['submit'])) {
 
     $auth = new FastAuth();
     try {
-        $userData;
+        $key;
         if (isset($_POST['mobile'])) {
-            $userData = $auth->getUserByMobileNumber($_POST['mobile']);
+            $key = $auth->requestUpdatePasswordWithMobile($_POST['mobile']);
         } else {
-            $userData = $auth->getUserByEmail($_POST['email']);
+            $key = $auth->requestUpdatePasswordWithEmail($_POST['email']);
         }
-        $uid = $userData['uid'];
-        $key = $auth->requestUpdatePassword($uid);
 
-        $otp = $auth->generateOTP($key);
+        $otpArr = $auth->generateOTP($key);
+        /* $otpArr = [
+            otp => <string> '865454',
+            sendTo => <string> '+917778887778',
+            sendType => <string> 'mobile',
+        ] */
 
-        $title = urlencode("OTP sent to $emailOrMobile");
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
+        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         die();
@@ -72,12 +76,16 @@ if (isset($_POST['submit'])) {
             const emailOrMobile = form.emailOrMobile.value;
 
             var isMobile = false;
+            var isError = false;
             handleEmailOrMobile(emailOrMobile, (b) => {
                 isMobile = b;
             }, (errorCode, message) => {
                 alert(message);
-                return false;
+                isError = true;
             });
+            if (isError) {
+                return false;
+            }
 
             /* eveything is now fine */
             if (isMobile) {

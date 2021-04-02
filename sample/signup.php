@@ -8,6 +8,7 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
 }
 
 require '../class.FastAuth.php';
+require '../class.FastAuthConstants.php';
 
 if (isset($_POST['submit'])) {
     $auth = new FastAuth();
@@ -22,13 +23,16 @@ if (isset($_POST['submit'])) {
         } else {
             $key = $auth->requestNewUserWithEmail($_POST['email'], $password, $name);
         }
-        $otp = $auth->generateOTP($key);
 
-        /* send this otp to provided mobile or email
-        */
+        $otpArr = $auth->generateOTP($key);
+        /* $otpArr = [
+            otp => <string> '865454',
+            sendTo => <string> '+917778887778',
+            sendType => <string> 'mobile',
+        ] */
 
-        $title = urlencode("OTP sent to $emailOrMobile");
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
+        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         // header("Location: ./index.php");
@@ -100,12 +104,16 @@ if (isset($_POST['submit'])) {
             }
 
             var isMobile = false;
+            var isError = false;
             handleEmailOrMobile(emailOrMobile, (b) => {
                 isMobile = b;
             }, (errorCode, message) => {
                 alert(message);
-                return false;
+                isError = true;
             });
+            if (isError) {
+                return false;
+            }
 
             if (password === '') {
                 alert("Please enter password");

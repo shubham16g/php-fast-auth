@@ -5,6 +5,7 @@ if (isset($_GET['passwordUpdateKey'])) {
 }
 
 require '../class.FastAuth.php';
+require '../class.FastAuthConstants.php';
 
 $auth = new FastAuth();
 

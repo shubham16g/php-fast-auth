@@ -8,6 +8,7 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
 }
 
 require '../class.FastAuth.php';
+require '../class.FastAuthConstants.php';
 
 if (isset($_POST['submit'])) {
     $auth = new FastAuth();
@@ -59,7 +60,7 @@ if (isset($_POST['submit'])) {
                 }
                 ?>
             </select>
-            <input type="text" name="emailOrMobile" id="emailOrMobile" autocomplete="off" class="input-block" style="visibility: hidden;">
+            <input type="text" name="emailOrMobile" id="emailOrMobile" autocomplete="off" class="input-block field" style="visibility: hidden;">
         </div>
 
         <label for="password">Password</label>
@@ -83,13 +84,16 @@ if (isset($_POST['submit'])) {
             const password = form.password.value;
 
             var isMobile = false;
+            var isError = false;
             handleEmailOrMobile(emailOrMobile, (b) => {
                 isMobile = b;
             }, (errorCode, message) => {
                 alert(message);
-                return false;
+                isError = true;
             });
-
+            if (isError) {
+                return false;
+            }
             if (password === '') {
                 alert("Please enter password");
                 return false;

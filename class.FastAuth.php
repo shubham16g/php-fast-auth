@@ -1,24 +1,4 @@
 <?php
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
-
-class FastAuthConstants
-{
-    public const DB_NAME = 'eleamapi';
-    public const SERVER_NAME = 'localhost';
-    public const USER_NAME = 'root';
-    public const PASSWORD = '';
-
-
-    public const OTP_LENGTH = 6;
-    public const OTP_CHARACTERS = '0123456789';
-    public const OTP_EXPIRES_IN = 3600;
-
-    public const TOKEN_EXPIRE_PERIOD = 2419200;
-    // public const OTP_CHARACTERS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-}
-
 class FastAuth
 {
     const FOR_RESET_PASSWORD = 8;
@@ -111,7 +91,9 @@ class FastAuth
 
     public function generateOTP(string $key)
     {
-        $this->_getKeyData($key);
+        $keyData = $this->_getKeyData($key, 'data');
+        print_r($keyData);
+        $data = (array)json_decode($keyData['data']);
         $otp = $this->_generateRandomOTP();
         $otpHash = $this->_cryptOTP($otp);
         $currentTime = $this->_getCurrentTimeForMySQL();
@@ -122,22 +104,37 @@ class FastAuth
         if (!mysqli_query($this->conn, $query)) {
             throw new Exception("Error in generating OTP", 1);
         }
-        return $otp;
+
+        $sendTo = '';
+        $sendType = '';
+        if (isset($data['mobile'])) {
+            $sendTo = $data['mobile'];
+            $sendType = 'mobile';
+        } elseif (isset($data['email'])) {
+            $sendTo = $data['email'];
+            $sendType = 'email';
+        } else {
+            throw new Exception("Unknown Error Occured", 1);
+        }
+
+        return [
+            'otp' => $otp,
+            'sendTo' => $sendTo,
+            'sendType' => $sendType
+        ];
     }
 
     public function verifyOTP(string $key, string $otp)
     {
-        $query = "SELECT `otpHash`, `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key'";
+        $otpHash = $this->_cryptOTP($otp);
+        $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key' AND `otpHash` = '$otpHash'";
         $res = mysqli_query($this->conn, $query);
         if (!mysqli_num_rows($res)) {
-            throw new Exception("No OTP exist with given Key", 1);
+            throw new Exception("No OTP exist with given Key or Invalid OTP", 1);
         }
         if ($row = mysqli_fetch_assoc($res)) {
-            $otpHash = $this->_cryptOTP($otp);
             if (!$this->_isValidTimePeriod($row['createdAt'], FastAuthConstants::OTP_EXPIRES_IN)) {
                 throw new Exception("Timeout! OTP Expires", 1);
-            } elseif ($otpHash !== $row['otpHash']) {
-                throw new Exception("Invalid OTP", 1);
             }
             return $this->_handleVerifySuccess($key);
         } else {
@@ -180,7 +177,6 @@ class FastAuth
     public function getUserByMobileNumber(string $mobile)
     {
         return $this->_getPrivateUser('*', 'mobile', $mobile);
-        
     }
     public function getUserByEmail(string $email)
     {
@@ -191,22 +187,36 @@ class FastAuth
 
     public function requestUpdateMobile(string $uid, string $newMobile)
     {
+        if ($this->_isUserExist('mobile', $newMobile)) {
+            throw new Exception("A user already exist with this mobile.", 1);
+        }
         return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['mobile' => $newMobile], true);
     }
 
     public function requestUpdateEmail(string $uid, string $newEmail)
     {
+        if ($this->_isUserExist('email', $newEmail)) {
+            throw new Exception("A user already exist with this email.", 1);
+        }
         return $this->_insertTemp($uid, self::CASE_UPDATE_EMAIL, ['email' => $newEmail], true);
     }
-    public function requestUpdatePassword(string $uid)
+    public function requestUpdatePasswordWithEmail(string $email)
     {
-        return $this->_insertTemp($uid, self::CASE_UPDATE_PASSWORD, null, true);
+        $row = $this->_getPrivateUser('uid', 'email', $email);
+        return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['email' => $email], true);
+    }
+
+    public function requestUpdatePasswordWithMobile(string $mobile)
+    {
+        $row = $this->_getPrivateUser('uid', 'mobile', $mobile);
+        return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['mobile' => $mobile], true);
     }
 
 
     public function updatePassword(string $passwordUpdateKey, string $newPassword)
     {
         $row = $this->_getKeyData($passwordUpdateKey, 'uid');
+        $this->_clearTable('fast_auth_temp', 'key', $passwordUpdateKey);
         return $this->_updateUser([
             'passwordHash' => password_hash($newPassword, PASSWORD_BCRYPT),
             'passwordUpdatedAt' => $this->_getCurrentTimeForMySQL()
@@ -226,9 +236,13 @@ class FastAuth
     }
 
     // force
-    public function updateUserName(string $uid, string $newName)
+    public function updateName(string $uid, string $newName)
     {
         return $this->_updateUser(['name' => $newName], $uid);
+    }
+    public function updateProfileURL(string $uid, string $newProfileURL)
+    {
+        return $this->_updateUser(['profileURL' => $newProfileURL], $uid);
     }
     // force
     public function disableUser(string $uid)
@@ -337,10 +351,12 @@ class FastAuth
     {
         $row = $this->_getKeyData($key, '*');
         // todo change * to column names
-        $data = json_decode($row['data']);
+        $data = (array) json_decode($row['data']);
+        $this->_clearTable('fast_auth_temp', 'key', $key);
+        $this->_clearTable('fast_auth_otps', 'key', $key);
         switch ($row['case']) {
             case self::CASE_NEW_USER:
-                $this->_insertUser((array)$data, $row['uid']);
+                $this->_insertUser($data, $row['uid']);
                 return ['case' => $row['case'], 'uid' => $row['uid']];
                 break;
             case self::CASE_UPDATE_PASSWORD:
@@ -349,7 +365,7 @@ class FastAuth
                 break;
             case self::CASE_UPDATE_EMAIL:
             case self::CASE_UPDATE_MOBILE:
-                $this->_updateUser((array)$data, $row['uid']);
+                $this->_updateUser($data, $row['uid']);
                 return ['case' => $row['case']];
                 break;
             default:
@@ -375,7 +391,7 @@ class FastAuth
     {
 
         if ($isUidExist && !$this->_isUserExist('uid', $uid)) {
-            throw new Exception("A user alerady exists with same mobile", 3);
+            throw new Exception("A user alerady exist", 3);
         }
 
         $key = $this->_randomStr(self::KEY_LENGTH);
@@ -479,13 +495,9 @@ class FastAuth
         ];
     }
 
-    private function _clearOTP(int $userID, string $otp, int $for)
+    private function _clearTable(string $tableName, string $column, string $value)
     {
-        $otpHash = $this->_cryptOTP($otp);
-        $query = "DELETE FROM `fast_auth_otps` WHERE 
-        `userID` = '$userID' AND
-        `otpHash` = '$otpHash' AND
-        `for` = '$for'";
+        $query = "DELETE FROM `$tableName` WHERE `$column` = '$value'";
         mysqli_query($this->conn, $query);
     }
 

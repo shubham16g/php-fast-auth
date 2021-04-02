@@ -1,6 +1,7 @@
 <?php
 session_start();
 require '../class.FastAuth.php';
+require '../class.FastAuthConstants.php';
 
 if (!isset($_GET['key'])) {
     die('Error');
@@ -47,11 +48,17 @@ try {
         header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
 
     } elseif (isset($_POST['resend'])) {
-        $newOtp = $auth->generateOTP($key);/* 
-        $title = urlencode("OTP re-sent to $emailOrMobile");
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: $otp");
+        $otpArr = $auth->generateOTP($key);
+        /* $otpArr = [
+            otp => <string> '865454',
+            sendTo => <string> '+917778887778',
+            sendType => <string> 'mobile',
+        ] */
+
+        $title = urlencode("OTP re-sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
-        header("Location: message.php?title=$title&content=$content&redirect=$redirect"); */
+        header("Location: message.php?title=$title&content=$content&redirect=$redirect");
     }
 } catch (Exception $e) {
     die($e->getMessage());
@@ -83,9 +90,6 @@ try {
 
     <script>
         function validateForm(event) {
-            var formData = new FormData(event.target);
-            const emailOrMobile = formData.get('emailOrMobile');
-            return validateEmailOrMobile(emailOrMobile);
             return true;
         }
     </script>

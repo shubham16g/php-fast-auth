@@ -56,7 +56,12 @@ input.input-block:focus {
 
 #emailMobileContainer>.input-block {
     border-color: transparent;
+    border-radius: 3px;
     margin: 0;
+}
+
+#emailMobileContainer>.field:focus {
+    border-color: #08f;
 }
 
 #emailMobileContainer>.cc-block {
