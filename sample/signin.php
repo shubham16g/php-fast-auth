@@ -16,7 +16,6 @@ if (isset($_POST['submit'])) {
     $password = $_POST['password'];
 
     // todo validate these post methods
-
     try {
         $signInResult;
         if (isset($_POST['mobile'])) {
@@ -28,8 +27,6 @@ if (isset($_POST['submit'])) {
         $_SESSION['uid'] = $signInResult['uid'];
         $_SESSION['token'] = $signInResult['token'];
         $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
-
-        header("Location: ../test.php");
         header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();

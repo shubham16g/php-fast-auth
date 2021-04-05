@@ -170,6 +170,10 @@ class FastAuth
     {
         return $this->_getPrivateUser('*', 'uid', $uid);
     }
+    public function getExtraJson(string $uid)
+    {
+        return $this->_getPrivateUser('extraJson', 'uid', $uid);
+    }
     public function isValidUser(string $uid)
     {
         return $this->_isUserExist('uid', $uid);
@@ -239,6 +243,13 @@ class FastAuth
     public function updateName(string $uid, string $newName)
     {
         return $this->_updateUser(['name' => $newName], $uid);
+    }
+    public function updateExtraJson(string $uid, array $extraJson = null)
+    {
+        if ($extraJson == null) {
+            return $this->_updateUser(['extraJson' => null], $uid);
+        }
+        return $this->_updateUser(['extraJson' => json_encode($extraJson)], $uid);
     }
     public function updateProfileURL(string $uid, string $newProfileURL)
     {
