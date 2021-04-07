@@ -14,9 +14,9 @@ $type = $_GET['type'];
 $uid = $_SESSION['uid'];
 
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
-$auth = new FastAuth();
+$auth = new FastAuth($fastAuthOptions);
 
 if (isset($_POST['submit'])) {
     $key;

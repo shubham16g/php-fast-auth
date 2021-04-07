@@ -5,9 +5,9 @@ if (isset($_GET['passwordUpdateKey'])) {
 }
 
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
-$auth = new FastAuth();
+$auth = new FastAuth($fastAuthOptions);
 
 if (isset($_POST['submit'])) {
     if (isset($_POST['currentPassword'])) {

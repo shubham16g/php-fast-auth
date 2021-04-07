@@ -1,13 +1,13 @@
 <?php
 session_start();
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
 if (!isset($_GET['key'])) {
     die('Error');
 }
 $key = $_GET['key'];
-$auth = new FastAuth();
+$auth = new FastAuth($fastAuthOptions);
 
 try {
     if (isset($_POST['submit'])) {
@@ -27,7 +27,7 @@ try {
                 break;
             case FastAuth::CASE_NEW_USER:
                 $uid = $result['uid'];
-                $signInResult = $auth->signInWithUid($uid);
+                $signInResult = $auth->forceSignIn($uid);
                 $_SESSION['uid'] = $signInResult['uid'];
                 $_SESSION['token'] = $signInResult['token'];
                 $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];

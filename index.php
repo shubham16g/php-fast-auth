@@ -1,5 +1,8 @@
 <?php
-header('Content-type: application/json');
+// header('Content-type: application/json');
+
+use FastAuth\Options;
+
 $time = microtime(true);
 
 
@@ -8,7 +11,12 @@ $time = microtime(true);
 
 
 require './class.FastAuth.php';
-$auth = new FastAuth();
+require './class.FastAuthConstants.php';
+
+
+$option = new FastAuth\Options("localhost", 'root', '', 'eleamapi');
+
+$auth = new FastAuth($option);
 
 $user = [
     // 'mobile' => "+919336508098",
@@ -25,10 +33,8 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
-require '../class.FastAuth.php';
 
 if (isset($_POST['submit'])) {
-    $auth = new FastAuth();
 
     $emailOrMobile = $_POST['emailOrMobile'];
     $password = $_POST['password'];

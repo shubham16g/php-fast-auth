@@ -6,9 +6,9 @@ if (!isset($_SESSION['uid']) || !isset($_SESSION['token'])) {
     header("Location: signin.php");
 }
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
-$auth = new FastAuth();
+$auth = new FastAuth($fastAuthOptions);
 
 $userData;
 try {

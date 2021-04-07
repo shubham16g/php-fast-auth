@@ -8,10 +8,10 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
 }
 
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
 if (isset($_POST['submit'])) {
-    $auth = new FastAuth();
+    $auth = new FastAuth($fastAuthOptions);
 
     $password = $_POST['password'];
 

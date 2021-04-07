@@ -6,13 +6,13 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
 $countryCodeList = ['+91', '+1', '+12', '+2'];
 
 require '../class.FastAuth.php';
-require '../class.FastAuthConstants.php';
+require './autoload.php';
 
 
 
 if (isset($_POST['submit'])) {
 
-    $auth = new FastAuth();
+    $auth = new FastAuth($fastAuthOptions);
     try {
         $key;
         if (isset($_POST['mobile'])) {

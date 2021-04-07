@@ -1,2 +1,2 @@
 # Fast-Auth
- Easy and Fast PHP authentication (MySQL Database)
+Easy and Fast PHP authentication (MySQL Database)
