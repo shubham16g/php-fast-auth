@@ -103,13 +103,13 @@ namespace {
 
         public function generateOTP(string $key)
         {
-            $keyData = $this->_getKeyData($key, 'data');
+            $keyData = $this->_getKeyData($key, '*');
             $attempts = $keyData['attempts'] + 1;
 
             if (!$this->_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
                 throw new Exception("Timeout! Key Expired", 1);
             }
-            
+
             if ($attempts > $this->generateOtpAttempts) {
                 throw new Exception("You reach the attempt's for this key", 1);
             }
@@ -251,7 +251,7 @@ namespace {
 
         public function updatePassword(string $passwordUpdateKey, string $newPassword)
         {
-            $row = $this->_getKeyData($passwordUpdateKey, 'uid');
+            $row = $this->_getKeyData($passwordUpdateKey, 'uid, createdAt');
             if (!$this->_isValidTimePeriod($row['createdAt'], $this->keyExpiresIn)) {
                 throw new Exception("Timeout! Key Expired", 1);
             }
@@ -430,13 +430,16 @@ namespace {
             if ($uid == null) {
                 $uid = $this->_randomStr(self::UID_LENGTH);
             }
-            return $this->_insertTemp($uid, self::CASE_NEW_USER, $params, !$isAnonymous);
+            if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+                throw new Exception("A user alerady exist", 3);
+            }
+            return $this->_insertTemp($uid, self::CASE_NEW_USER, $params);
         }
 
-        private function _insertTemp(string $uid, int $case, array $params = null, bool $isUidExist = false)
+        private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false)
         {
-            if ($isUidExist && !$this->_isUserExist('uid', $uid)) {
-                throw new Exception("A user alerady exist", 3);
+            if ($checkIsUidExist && !$this->_isUserExist('uid', $uid)) { //check krna hai aur user exist nahi karta to
+                throw new Exception("No user exist with given uid", 3);
             }
             $key = $this->_randomStr(self::KEY_LENGTH);
             $currentDate = $this->_getCurrentTimeForMySQL();
