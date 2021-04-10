@@ -1,4 +1,7 @@
 <?php
+
+use FastAuth\Options;
+
 if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
@@ -12,7 +15,10 @@ require './autoload.php';
 
 if (isset($_POST['submit'])) {
 
-    $auth = new FastAuth($fastAuthOptions);
+    $auth = new FastAuth($host, $username, $password, $dbname);
+    $options = new FastAuth\Options();
+    $options->otpLength = 8;
+    $auth->setOptions($options);
     try {
         $key;
         if (isset($_POST['mobile'])) {

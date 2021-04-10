@@ -1,5 +1,21 @@
 <?php
 
+namespace FastAuth {
+    class Options
+    {
+        public $otpLength = 6;
+        public $otpCharacters = '0123456789';
+        public $otpExpiresIn = 3600;
+
+        public $generateOtpAttempts = 3;
+
+        public $keyExpiresIn = 3600;
+
+        public $tokenExpirePeriod = 2419200;
+
+    }
+}
+
 namespace {
 
     use FastAuth\Options;
@@ -21,7 +37,8 @@ namespace {
         public const CASE_UPDATE_PASSWORD = 8;
         private const CASE_PRIVATE_PASSWORD_UPDATE = 9;
 
-        public function __construct(Options $options)
+
+        public function setOptions(Options $options)
         {
             $this->otpLength = $options->otpLength;
             $this->otpExpiresIn = $options->otpExpiresIn;
@@ -29,8 +46,15 @@ namespace {
             $this->keyExpiresIn = $options->keyExpiresIn;
             $this->tokenExpirePeriod = $options->tokenExpirePeriod;
             $this->generateOtpAttempts = $options->generateOtpAttempts;
+        }
 
-            $this->conn = mysqli_connect($options->serverName, $options->userName, $options->password, $options->dbName);
+        
+        public function __construct($host, $username, $password, $dbname)
+        {
+
+            $this->setOptions(new Options());
+
+            $this->conn = mysqli_connect($host, $username, $password, $dbname);
             mysqli_options($this->conn, MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
 
             $createUsersTable = "CREATE TABLE IF NOT EXISTS `fast_auth_users` (
@@ -766,31 +790,4 @@ namespace {
     }
 }
 
-namespace FastAuth {
-    class Options
-    {
 
-        public $serverName = '';
-        public $userName = '';
-        public $password = '';
-        public $dbName = '';
-
-        public $otpLength = 6;
-        public $otpCharacters = '0123456789';
-        public $otpExpiresIn = 3600;
-
-        public $generateOtpAttempts = 3;
-
-        public $keyExpiresIn = 3600;
-
-        public $tokenExpirePeriod = 2419200;
-
-        public function __construct($serverName, $userName, $password, $dbName)
-        {
-            $this->serverName = $serverName;
-            $this->userName = $userName;
-            $this->password = $password;
-            $this->dbName = $dbName;
-        }
-    }
-}
