@@ -11,7 +11,7 @@ require '../class.FastAuth.php';
 require './autoload.php';
 
 if (isset($_POST['submit'])) {
-    $auth = new FastAuth($fastAuthOptions);
+    $auth = new FastAuth($db);
 
     $password = $_POST['password'];
 

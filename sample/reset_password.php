@@ -7,10 +7,8 @@ if (isset($_GET['passwordUpdateKey'])) {
 require '../class.FastAuth.php';
 require './autoload.php';
 
-$auth = new FastAuth($host, $username, $password, $dbname);
-$options = new FastAuth\Options();
-$options->otpLength = 8;
-$auth->setOptions($options);
+$auth = new FastAuth($db);
+
 if (isset($_POST['submit'])) {
     if (isset($_POST['currentPassword'])) {
         // todo

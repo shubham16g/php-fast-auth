@@ -31,11 +31,17 @@ namespace {
         private const TOKEN_LENGTH = 39;
         private const KEY_LENGTH = 32;
 
+
         public const CASE_NEW_USER = 5;
         public const CASE_UPDATE_MOBILE = 6;
         public const CASE_UPDATE_EMAIL = 7;
         public const CASE_UPDATE_PASSWORD = 8;
         private const CASE_PRIVATE_PASSWORD_UPDATE = 9;
+
+        public const ERROR_MYSQLI_QUERY_MSG = 'Error in mysqli query';
+        public const ERROR_MYSQLI_QUERY_CODE = 964;
+        public const ERROR_MYSQLI_CONNECT_MSG = 'Error in mysqli connection';
+        public const ERROR_MYSQLI_CONNECT_CODE = 458;
 
 
         public function setOptions(Options $options)
@@ -49,13 +55,12 @@ namespace {
         }
 
         
-        public function __construct($host, $username, $password, $dbname)
+        public function __construct(mysqli $db)
         {
 
             $this->setOptions(new Options());
 
-            $this->conn = mysqli_connect($host, $username, $password, $dbname);
-            mysqli_options($this->conn, MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
+
 
             $createUsersTable = "CREATE TABLE IF NOT EXISTS `fast_auth_users` (
             `uid` VARCHAR(255) NOT NULL ,
@@ -100,14 +105,21 @@ namespace {
             PRIMARY KEY (`id`)
             );";
 
-            mysqli_query($this->conn, $createTempTable);
+            if ($db->connect_errno) {
+                throw new Exception(self::ERROR_MYSQLI_CONNECT_MSG, self::ERROR_MYSQLI_CONNECT_CODE);
+            }
+
+            $db->query($createTempTable);
             // echo "<br>--------------<br>";
-            mysqli_query($this->conn, $createUsersTable);
+            $db->query($createUsersTable);
             // echo "<br>--------------<br>";
-            mysqli_query($this->conn, $createTokensTable);
+            $db->query($createTokensTable);
             // echo "<br>--------------<br>";
-            mysqli_query($this->conn, $createOTPsTable);
+            $db->query($createOTPsTable);
             // echo "<br>--------------<br>";
+            $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
+            $this->db = $db;
+
         }
 
         public function requestNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
@@ -146,8 +158,8 @@ namespace {
             $query = "INSERT INTO `fast_auth_otps` (`key`,`otpHash`,`createdAt`) VALUES
             ('$key', '$otpHash', '$currentTime')";
 
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("Error in generating OTP", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
 
             $sendTo = '';
@@ -163,7 +175,7 @@ namespace {
             }
 
             $qz = "UPDATE `fast_auth_temp` SET attemps = $attempts WHERE `key` = '$key'";
-            mysqli_query($this->conn, $qz);
+            $this->db->query($qz);
 
             return [
                 'otp' => $otp,
@@ -178,11 +190,14 @@ namespace {
         {
             $otpHash = $this->_cryptOTP($otp);
             $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key' AND `otpHash` = '$otpHash'";
-            $res = mysqli_query($this->conn, $query);
-            if (!mysqli_num_rows($res)) {
+            $res = $this->db->query($query);
+            if (!$res) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            }
+            if (!$res->num_rows) {
                 throw new Exception("Invalid OTP", 1);
             }
-            if ($row = mysqli_fetch_assoc($res)) {
+            if ($row = $res->fetch_assoc()) {
                 if (!$this->_isValidTimePeriod($row['createdAt'], $this->otpExpiresIn)) {
                     throw new Exception("Timeout! OTP Expires", 1);
                 }
@@ -332,14 +347,14 @@ namespace {
         {
             // todo also check in userTable
             $query = "SELECT * FROM `fast_auth_tokens` WHERE `token` = '$token' AND `uid` = '$uid'";
-            $res = mysqli_query($this->conn, $query);
+            $res = $this->db->query($query);
             if (!$res) {
-                throw new Exception("Unknown Error Occureds", 1);
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
-            if (!mysqli_num_rows($res)) {
+            if (!$res->num_rows) {
                 throw new Exception("Invalid token or uid", 1);
             }
-            if ($row = mysqli_fetch_assoc($res)) {
+            if ($row = $res->fetch_assoc()) {
                 $timeGap = $this->_isValidTimePeriod($row['createdAt'], $row['expiresIn']);
                 if (!$timeGap) {
                     throw new Exception("Token timeout", 1);
@@ -348,7 +363,7 @@ namespace {
                 } else {
                     $timeGap = $timeGap + $this->tokenExpirePeriod;
                     $q2 = "UPDATE `fast_auth_tokens` SET `expiresIn` = '$timeGap' WHERE `token` = '$token' AND `uid` = '$uid'";
-                    mysqli_query($this->conn, $q2);
+                    $this->db->query($q2);
                     return $token;
                 }
             }
@@ -360,8 +375,8 @@ namespace {
             if ($exceptToken) {
                 $query .= " AND `token` <> '$exceptToken'";
             }
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("Unknown Error Occured", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
             return true;
         }
@@ -386,8 +401,8 @@ namespace {
             $q = substr($q, 1);
 
             $query = "UPDATE `fast_auth_users` SET $q WHERE `uid` = '$uid'";
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("Unknown Error occured", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
             return true;
         }
@@ -395,11 +410,14 @@ namespace {
         private function _getPrivateUser(string $columns, string $key, string $value)
         {
             $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value'";
-            $res = mysqli_query($this->conn, $query);
-            if (!mysqli_num_rows($res)) {
+            $res = $this->db->query($query);
+            if (!$res) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            }
+            if (!$res->num_rows) {
                 throw new Exception("No user exists with given $key", 1);
             }
-            if ($row = mysqli_fetch_assoc($res)) {
+            if ($row = $res->fetch_assoc()) {
                 return $row;
             } else {
                 throw new Exception("DB Error", 1);
@@ -476,8 +494,8 @@ namespace {
                 $query = "INSERT INTO `fast_auth_temp` (`key`,`uid`,`createdAt`,`case`) VALUES ('$key', '$uid', '$currentDate', '$case');";
             }
 
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("DB Error", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
             return $key;
         }
@@ -487,14 +505,14 @@ namespace {
                 $columns = '`case`';
             }
             $query = "SELECT $columns FROM `fast_auth_temp` WHERE `key` = '$key'";
-            $res = mysqli_query($this->conn, $query);
+            $res = $this->db->query($query);
             if (!$res) {
-                throw new Exception("DB Error $query", 1);
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
-            if (!mysqli_num_rows($res)) {
+            if (!$res->num_rows) {
                 throw new Exception("This key isn't exist", 1);
             }
-            if ($row = mysqli_fetch_assoc($res)) {
+            if ($row = $res->fetch_assoc()) {
                 return $row;
             } else {
                 throw new Exception("Unknown Error Occur", 1);
@@ -523,8 +541,8 @@ namespace {
             }
             $currentTime = $this->_getCurrentTimeForMySQL();
             $query = "INSERT INTO `fast_auth_users` ($colums `uid`, `createdAt`, `passwordUpdatedAt`) VALUES ($values '$uid', '$currentTime', '$currentTime');";
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("DB Error", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
         }
         private function _signIn(string $key, string $value, string $password = null, array $deviceJson = null)
@@ -556,8 +574,8 @@ namespace {
         ('$token', '$uid', '$currentTime' , '$expirePeriod')";
             }
 
-            if (!mysqli_query($this->conn, $query)) {
-                throw new Exception("DB Error", 1);
+            if (!$this->db->query($query)) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
             }
             return [
                 'uid' => $uid,
@@ -569,7 +587,7 @@ namespace {
         private function _clearTable(string $tableName, string $column, string $value)
         {
             $query = "DELETE FROM `$tableName` WHERE `$column` = '$value'";
-            mysqli_query($this->conn, $query);
+            $this->db->query($query);
         }
 
         private function _generateRandomOTP()
@@ -600,11 +618,8 @@ namespace {
             // return openssl_decrypt($otpHash, "AES-128-ECB", "__^!@XQ@z#$&*^%%Y&$&*^__");
         }
 
-        private function _getCurrentTimeForMySQL(bool $isOnlyDate = false)
+        private function _getCurrentTimeForMySQL()
         {
-            if ($isOnlyDate) {
-                return date('Y-m-d', time());
-            }
             return date('Y-m-d H:i:s', time());
         }
 
@@ -731,7 +746,7 @@ namespace {
         `userID` = '$userID' AND
         `otpHash` = '$otpHash' AND
         `for` = '$for'";
-        $res = mysqli_query($this->conn, $query);
+        $res = mysqli_query($query);
         if (!mysqli_num_rows($res)) {
             throw new Exception("Invalid OTP", 1);
         }
@@ -782,7 +797,7 @@ namespace {
         $query = "INSERT INTO `fast_auth_otps` (`userID`,`otpHash`,`for`,`createdAt`) VALUES
         ('$userID', '$otpHash', '$for', '$currentTime')";
 
-        if (!mysqli_query($this->conn, $query)) {
+        if (!mysqli_query($query)) {
             throw new Exception("Error in generating OTP", 1);
         }
         return $otp;
