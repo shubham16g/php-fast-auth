@@ -256,6 +256,24 @@ namespace {
             return $this->_getPrivateUser('*', 'email', $email);
         }
 
+        public function listUsers(int $page = 1, int $usersPerPage = 20, string $orderBy = 'createdAt DESC')
+        {
+            $offset = ($page - 1) * $usersPerPage;
+            $query = "SELECT * FROM `fast_auth_users` ORDER BY $orderBy LIMIT $offset, $usersPerPage";
+            $res = $this->db->query($query);
+            if (!$res) {
+                throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            }
+            if (!$res->num_rows) {
+                throw new Exception("No user exists in this range", 1);
+            }
+            $array = [];
+            while ($row = $res->fetch_assoc()) {
+                $array[] = $row;
+            }
+            return $array;
+        }
+
         // *************************************** User Edits ***********-******-*-*--*-**********
 
         public function requestUpdateMobile(string $uid, string $newMobile)
