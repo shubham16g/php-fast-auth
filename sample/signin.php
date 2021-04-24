@@ -11,12 +11,12 @@ require '../class.FastAuth.php';
 require './autoload.php';
 
 if (isset($_POST['submit'])) {
-    $auth = new FastAuth($db);
-
+    
     $password = $_POST['password'];
-
+    
     // todo validate these post methods
     try {
+        $auth = new FastAuth($db);
         $signInResult;
         if (isset($_POST['mobile'])) {
             $signInResult = $auth->signInWithMobileAndPassword($_POST['mobile'], $password);

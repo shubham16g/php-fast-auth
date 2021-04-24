@@ -11,13 +11,13 @@ require '../class.FastAuth.php';
 require './autoload.php';
 
 if (isset($_POST['submit'])) {
-    $auth = new FastAuth($db);
 
     $name = $_POST['name'];
     $password = $_POST['password'];
 
     $key;
     try {
+        $auth = new FastAuth($db);
         if (isset($_POST['mobile'])) {
             $key = $auth->requestNewUserWithMobile($_POST['mobile'], $password, $name);
         } else {
@@ -29,6 +29,7 @@ if (isset($_POST['submit'])) {
             otp => <string> '865454',
             sendTo => <string> '+917778887778',
             sendType => <string> 'mobile',
+            name => <string> 'Shubham Gupta',
         ] */
 
         $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);

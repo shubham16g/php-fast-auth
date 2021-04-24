@@ -7,9 +7,9 @@ if (!isset($_GET['key'])) {
     die('Error');
 }
 $key = $_GET['key'];
-$auth = new FastAuth($db);
 
 try {
+    $auth = new FastAuth($db);
     if (isset($_POST['submit'])) {
 
         $title = '';
@@ -47,7 +47,7 @@ try {
 
         header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
     } elseif (isset($_POST['resend'])) {
-        $otpArr = $auth->generateOTP($key);
+        $otpArr = $auth->getResendOTP($key);
         /* $otpArr = [
             otp => <string> '865454',
             sendTo => <string> '+917778887778',

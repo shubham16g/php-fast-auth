@@ -8,10 +8,10 @@ if (!isset($_SESSION['uid']) || !isset($_SESSION['token'])) {
 require '../class.FastAuth.php';
 require './autoload.php';
 
-$auth = new FastAuth($db);
 
 $userData;
 try {
+    $auth = new FastAuth($db);
     $uid = $_SESSION['uid'];
     $auth->verifyUser($uid, $_SESSION['token']);
     $userData = $auth->getUser($uid);

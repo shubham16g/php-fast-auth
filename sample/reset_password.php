@@ -7,7 +7,6 @@ if (isset($_GET['passwordUpdateKey'])) {
 require '../class.FastAuth.php';
 require './autoload.php';
 
-$auth = new FastAuth($db);
 
 if (isset($_POST['submit'])) {
     if (isset($_POST['currentPassword'])) {
@@ -15,6 +14,7 @@ if (isset($_POST['submit'])) {
     } elseif (isset($_GET['passwordUpdateKey'])) {
         $passwordUpdateKey = $_GET['passwordUpdateKey'];
         try {
+            $auth = new FastAuth($db);
             $auth->updatePassword($passwordUpdateKey, $_POST['password']);
             // $auth->signOutAllDevices($uid);
 

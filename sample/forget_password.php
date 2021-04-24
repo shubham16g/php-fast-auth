@@ -15,9 +15,9 @@ require './autoload.php';
 
 if (isset($_POST['submit'])) {
 
-    $auth = new FastAuth($db);
     
     try {
+        $auth = new FastAuth($db);
         $key;
         if (isset($_POST['mobile'])) {
             $key = $auth->requestUpdatePasswordWithMobile($_POST['mobile']);

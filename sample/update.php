@@ -16,40 +16,42 @@ $uid = $_SESSION['uid'];
 require '../class.FastAuth.php';
 require './autoload.php';
 
-$auth = new FastAuth($db);
+try {
+
+    $auth = new FastAuth($db);
 
 
-
-
-if (isset($_POST['submit'])) {
-    $key;
-    if ($type === 'mobile') {
-        $key = $auth->requestUpdateMobile($uid, $_POST['mobile']);
-    } elseif ($type === 'email') {
-        $key = $auth->requestUpdateEmail($uid, $_POST['email']);
-    } elseif ($type === 'name') {
-        $auth->updateName($uid, $_POST['text']);
-        header("Location: index.php");
-        die();
-    } elseif ($type === 'profile url') {
-        $auth->updateProfileURL($uid, $_POST['text']);
-        header("Location: index.php");
-        die();
-    }
-    $otpArr = $auth->generateOTP($key);
-    /* $otpArr = [
+    if (isset($_POST['submit'])) {
+        $key;
+        if ($type === 'mobile') {
+            $key = $auth->requestUpdateMobile($uid, $_POST['mobile']);
+        } elseif ($type === 'email') {
+            $key = $auth->requestUpdateEmail($uid, $_POST['email']);
+        } elseif ($type === 'name') {
+            $auth->updateName($uid, $_POST['text']);
+            header("Location: index.php");
+            die();
+        } elseif ($type === 'profile url') {
+            $auth->updateProfileURL($uid, $_POST['text']);
+            header("Location: index.php");
+            die();
+        }
+        $otpArr = $auth->generateOTP($key);
+        /* $otpArr = [
             otp => <string> '865454',
             sendTo => <string> '+917778887778',
             sendType => <string> 'mobile',
         ] */
 
-    $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
-    $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
-    $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
-    header("Location: message.php?title=$title&content=$content&redirect=$redirect");
+        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
+        $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
+        header("Location: message.php?title=$title&content=$content&redirect=$redirect");
+    }
+
+} catch (Exception $e) {
+    echo $e->getMessage();
 }
-
-
 
 ?>
 <!DOCTYPE html>
