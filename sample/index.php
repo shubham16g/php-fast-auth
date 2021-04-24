@@ -13,7 +13,7 @@ $userData;
 try {
     $auth = new FastAuth($db);
     $uid = $_SESSION['uid'];
-    $auth->verifyUser($uid, $_SESSION['token']);
+    $auth->verifyToken($_SESSION['token']);
     $userData = $auth->getUser($uid);
 
     if (isset($_POST['updateMobile'])) {

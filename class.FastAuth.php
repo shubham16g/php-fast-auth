@@ -16,10 +16,44 @@ class FastAuth
     public const CASE_UPDATE_PASSWORD = 8;
     private const CASE_PRIVATE_PASSWORD_UPDATE = 9;
 
-    public const ERROR_MYSQLI_QUERY_MSG = 'Error in mysqli query';
-    public const ERROR_MYSQLI_QUERY_CODE = 964;
-    public const ERROR_MYSQLI_CONNECT_MSG = 'Error in mysqli connection';
-    public const ERROR_MYSQLI_CONNECT_CODE = 458;
+    public const D_ERROR_MYSQLI_QUERY_MSG = 'Query Error';
+    public const D_ERROR_MYSQLI_CONNECT_MSG = 'Connection Error';
+    public const D_ERROR_UNKNOWN_MSG = 'Unknown Error';
+    
+    public const ERROR_MSG = 'Fast-Auth Error';
+    public const ERROR_EMAIL_ALREADY_EXISTS_MSG = 'A user alerady exists with same email';
+    public const ERROR_MOBILE_ALREADY_EXISTS_MSG = 'A user alerady exists with same mobile';
+    public const ERROR_OTP_ALREADY_EXISTS_MSG = 'OTP Already Generated';
+    public const ERROR_OTP_INVALID_MSG = 'Invalid OTP';
+    public const ERROR_OTP_EXPIRED_MSG = 'Timeout! OTP Expired';
+    public const ERROR_KEY_INVALID_MSG = 'Invalid Key';
+    public const ERROR_KEY_EXPIRED_MSG = 'Timeout! Key Expired';
+    public const ERROR_KEY_ATTEMPTS_MSG = 'You reach the attempt\'s for this key';
+    public const ERROR_KEY_HAS_NO_OTP_MSG = 'No OTP exist with this key';
+    public const ERROR_PASSWORD_INCORRECT_MSG = 'Incorrect Password';
+    public const ERROR_TOKEN_INVALID_MSG = 'Invalid Token';
+    public const ERROR_TOKEN_EXPIRED_MSG = 'Timeout! Token Expired';
+    public const ERROR_TOKEN_DISABLED_MSG = 'Token Disabled';
+    public const ERROR_USER_NOT_EXIST_MSG = 'No user Exist';
+    public const ERROR_USER_DISABLED_MSG = 'User Disabled';
+
+    public const ERROR_CODE = 30;
+    public const ERROR_EMAIL_ALREADY_EXISTS_CODE = 31;
+    public const ERROR_MOBILE_ALREADY_EXISTS_CODE = 32;
+    public const ERROR_OTP_ALREADY_EXISTS_CODE = 33;
+    public const ERROR_OTP_INVALID_CODE = 34;
+    public const ERROR_OTP_EXPIRED_CODE = 35;
+    public const ERROR_KEY_INVALID_CODE = 36;
+    public const ERROR_KEY_EXPIRED_CODE = 37;
+    public const ERROR_KEY_ATTEMPTS_CODE = 38;
+    public const ERROR_KEY_HAS_NO_OTP_CODE = 39;
+    public const ERROR_PASSWORD_INCORRECT_CODE = 40;
+    public const ERROR_TOKEN_INVALID_CODE = 41;
+    public const ERROR_TOKEN_EXPIRED_CODE = 42;
+    public const ERROR_TOKEN_DISABLED_CODE = 43;
+    public const ERROR_USER_NOT_EXIST_CODE = 44;
+    public const ERROR_USER_DISABLED_CODE = 45;
+
 
     private function _setOptions(array $options = null)
     {
@@ -47,9 +81,18 @@ class FastAuth
 
     public function __construct(mysqli $db, array $optionsArray = null)
     {
-
         $this->_setOptions($optionsArray);
+        if ($db->connect_errno) {
+            throw new Exception(self::D_ERROR_MYSQLI_CONNECT_MSG, self::ERROR_CODE);
+        }
+        $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
+        $this->db = $db;
 
+        $this->initialize();
+    }
+
+    public function initialize()
+    {
         $createUsersTable = "CREATE TABLE IF NOT EXISTS `fast_auth_users` (
             `uid` VARCHAR(255) NOT NULL ,
             `email` VARCHAR(255) NULL ,
@@ -93,33 +136,24 @@ class FastAuth
             PRIMARY KEY (`id`)
             );";
 
-        if ($db->connect_errno) {
-            throw new Exception(self::ERROR_MYSQLI_CONNECT_MSG, self::ERROR_MYSQLI_CONNECT_CODE);
+        if (!$this->db->multi_query($createTempTable . $createUsersTable . $createTokensTable . $createOTPsTable)) {
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
-
-        $db->query($createTempTable);
-        // echo "<br>--------------<br>";
-        $db->query($createUsersTable);
-        // echo "<br>--------------<br>";
-        $db->query($createTokensTable);
-        // echo "<br>--------------<br>";
-        $db->query($createOTPsTable);
-        // echo "<br>--------------<br>";
-        $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
-        $this->db = $db;
     }
+
+
 
     public function requestNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
         if ($this->_isUserExist('email', $email)) {
-            throw new Exception("A user alerady exists with same email", 3);
+            throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
         return $this->_newTempUser(['email' => $email], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
     }
     public function requestNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
         if ($this->_isUserExist('email', $mobile)) {
-            throw new Exception("A user alerady exists with same mobile", 3);
+            throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
         return $this->_newTempUser(['mobile' => $mobile], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
     }
@@ -129,16 +163,16 @@ class FastAuth
         $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if ($res->num_rows)
-            throw new Exception("OTP Already Generated", 1);
+            throw new Exception(self::ERROR_OTP_ALREADY_EXISTS_MSG, self::ERROR_OTP_ALREADY_EXISTS_CODE);
 
         $keyData = $this->_getKeyData($key, '*');
         // $attempts = $keyData['attempts'] + 1;
 
         if (!$this->_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
-            throw new Exception("Timeout! Key Expired", 1);
+            throw new Exception(self::ERROR_KEY_EXPIRED_MSG, self::ERROR_KEY_EXPIRED_CODE);
         }
 
         // if ($attempts > $this->generateOtpAttempts) {
@@ -154,7 +188,7 @@ class FastAuth
             ('$key', '$otpHash', '$currentTime')";
 
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
 
         $sendTo = '';
@@ -166,10 +200,8 @@ class FastAuth
             $sendTo = $data['email'];
             $sendType = 'email';
         } else {
-            throw new Exception("Unknown Error Occured", 1);
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
-
-
 
         return [
             'otp' => $otp,
@@ -187,18 +219,18 @@ class FastAuth
         $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key' AND `otpHash` = '$otpHash'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if (!$res->num_rows) {
-            throw new Exception("Invalid OTP", 1);
+            throw new Exception(self::ERROR_OTP_INVALID_MSG, self::ERROR_OTP_INVALID_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             if (!$this->_isValidTimePeriod($row['createdAt'], $this->otpExpiresIn)) {
-                throw new Exception("Timeout! OTP Expires", 1);
+                throw new Exception(self::ERROR_OTP_EXPIRED_MSG, self::ERROR_OTP_EXPIRED_MSG);
             }
             return $this->_handleVerifySuccess($key);
         } else {
-            throw new Exception("DB Error", 1);
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
 
@@ -208,24 +240,24 @@ class FastAuth
         $attempts = $keyData['attempts'] + 1;
 
         if (!$this->_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
-            throw new Exception("Timeout! Key Expired", 1);
+            throw new Exception(self::ERROR_KEY_EXPIRED_MSG, self::ERROR_KEY_EXPIRED_CODE);
         }
 
         if ($attempts > $this->generateOtpAttempts) {
-            throw new Exception("You reach the attempt's for this key", 1);
+            throw new Exception(self::ERROR_KEY_ATTEMPTS_MSG, self::ERROR_KEY_ATTEMPTS_CODE);
         }
 
         $query = "SELECT `createdAt` FROM `fast_auth_otps` WHERE `key` = '$key'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if (!$res->num_rows) {
-            throw new Exception("No OTP exist with this key", 1);
+            throw new Exception(self::ERROR_KEY_HAS_NO_OTP_MSG, self::ERROR_KEY_HAS_NO_OTP_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             if (!$this->_isValidTimePeriod($row['createdAt'], $this->otpExpiresIn)) {
-                throw new Exception("Timeout! OTP Expires", 1);
+                throw new Exception(self::ERROR_OTP_EXPIRED_CODE, self::ERROR_OTP_EXPIRED_CODE);
             }
             $sendTo = '';
             $sendType = '';
@@ -237,7 +269,7 @@ class FastAuth
                 $sendTo = $data['email'];
                 $sendType = 'email';
             } else {
-                throw new Exception("Unknown Error Occured", 1);
+                throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
             }
             $qz = "UPDATE `fast_auth_temp` SET attempts = $attempts WHERE `key` = '$key'";
             $this->db->query($qz);
@@ -249,7 +281,7 @@ class FastAuth
                 'sendType' => $sendType
             ];
         } else {
-            throw new Exception("DB Error", 1);
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
 
@@ -307,12 +339,12 @@ class FastAuth
         $query = "SELECT count(*) FROM `fast_auth_users`";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             return $row['count(*)'];
         } else {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
     }
     public function getPagesCount(int $usersCount, int $usersPerPage = 20)
@@ -320,16 +352,15 @@ class FastAuth
         return ceil($usersCount / $usersPerPage);
     }
 
+    
+
     public function listUsers(int $page = 1, int $usersPerPage = 20, string $orderBy = 'createdAt DESC')
     {
         $offset = ($page - 1) * $usersPerPage;
         $query = "SELECT * FROM `fast_auth_users` ORDER BY $orderBy LIMIT $offset, $usersPerPage";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
-        }
-        if (!$res->num_rows) {
-            throw new Exception("No user exists in this range", 1);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         $array = [];
         while ($row = $res->fetch_assoc()) {
@@ -337,13 +368,12 @@ class FastAuth
         }
         return $array;
     }
-
     // *************************************** User Edits ***********-******-*-*--*-**********
 
     public function requestUpdateMobile(string $uid, string $newMobile)
     {
         if ($this->_isUserExist('mobile', $newMobile)) {
-            throw new Exception("A user already exist with this mobile.", 1);
+            throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
         $row = $this->_getPrivateUser('name', 'uid', $uid);
         return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['mobile' => $newMobile, 'name' => $row['name']], true);
@@ -352,7 +382,7 @@ class FastAuth
     public function requestUpdateEmail(string $uid, string $newEmail)
     {
         if ($this->_isUserExist('email', $newEmail)) {
-            throw new Exception("A user already exist with this email.", 1);
+            throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
         $row = $this->_getPrivateUser('name', 'uid', $uid);
         return $this->_insertTemp($uid, self::CASE_UPDATE_EMAIL, ['email' => $newEmail, 'name' => $row['name']], true);
@@ -374,7 +404,7 @@ class FastAuth
     {
         $row = $this->_getKeyData($passwordUpdateKey, 'uid, createdAt');
         if (!$this->_isValidTimePeriod($row['createdAt'], $this->keyExpiresIn)) {
-            throw new Exception("Timeout! Key Expired", 1);
+            throw new Exception(self::ERROR_KEY_EXPIRED_MSG, self::ERROR_KEY_EXPIRED_CODE);
         }
         $this->_clearTable('fast_auth_temp', 'key', $passwordUpdateKey);
         return $this->_updateUser([
@@ -387,7 +417,7 @@ class FastAuth
     {
         $row = $this->_getPrivateUser('passwordHash', 'uid', $uid);
         if (!password_verify($currentPassword, $row['passwordHash'])) {
-            throw new Exception("Password Incorrect", 1);
+            throw new Exception(self::ERROR_PASSWORD_INCORRECT_MSG, self::ERROR_PASSWORD_INCORRECT_CODE);
         }
         return $this->_updateUser([
             'passwordHash' => password_hash($newPassword, PASSWORD_BCRYPT),
@@ -430,17 +460,17 @@ class FastAuth
         $query = "SELECT * FROM `fast_auth_tokens` WHERE `token` = '$token'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if (!$res->num_rows) {
-            throw new Exception("Invalid token", 1);
+            throw new Exception(self::ERROR_TOKEN_INVALID_MSG, self::ERROR_TOKEN_INVALID_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             $timeGap = $this->_isValidTimePeriod($row['createdAt'], $row['expiresIn']);
             if (!$timeGap) {
-                throw new Exception("Token timeout", 1);
+                throw new Exception(self::ERROR_TOKEN_EXPIRED_MSG, self::ERROR_TOKEN_EXPIRED_CODE);
             } elseif ($row['disabled']) {
-                throw new Exception("Token disabled", 1);
+                throw new Exception(self::ERROR_TOKEN_DISABLED_MSG, self::ERROR_TOKEN_DISABLED_CODE);
             } else {
                 $timeGap = $timeGap + $this->tokenExpirePeriod;
                 $q2 = "UPDATE `fast_auth_tokens` SET `expiresIn` = '$timeGap' WHERE `token` = '$token'";
@@ -448,33 +478,7 @@ class FastAuth
                 return $row['uid'];
             }
         } else {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
-        }
-    }
-
-    public function verifyUser(string $uid, string $token)
-    {
-        // todo also check in userTable
-        $query = "SELECT * FROM `fast_auth_tokens` WHERE `token` = '$token' AND `uid` = '$uid'";
-        $res = $this->db->query($query);
-        if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
-        }
-        if (!$res->num_rows) {
-            throw new Exception("Invalid token or uid", 1);
-        }
-        if ($row = $res->fetch_assoc()) {
-            $timeGap = $this->_isValidTimePeriod($row['createdAt'], $row['expiresIn']);
-            if (!$timeGap) {
-                throw new Exception("Token timeout", 1);
-            } elseif ($row['disabled']) {
-                throw new Exception("Token disabled", 1);
-            } else {
-                $timeGap = $timeGap + $this->tokenExpirePeriod;
-                $q2 = "UPDATE `fast_auth_tokens` SET `expiresIn` = '$timeGap' WHERE `token` = '$token' AND `uid` = '$uid'";
-                $this->db->query($q2);
-                return $token;
-            }
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
     }
 
@@ -485,7 +489,7 @@ class FastAuth
             $query .= " AND `token` <> '$exceptToken'";
         }
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         return true;
     }
@@ -511,7 +515,7 @@ class FastAuth
 
         $query = "UPDATE `fast_auth_users` SET $q WHERE `uid` = '$uid'";
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         return true;
     }
@@ -521,15 +525,15 @@ class FastAuth
         $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if (!$res->num_rows) {
-            throw new Exception("No user exists with given $key", 1);
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             return $row;
         } else {
-            throw new Exception("DB Error", 1);
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
     // todo make it private
@@ -566,8 +570,7 @@ class FastAuth
                 return ['case' => $row['case']];
                 break;
             default:
-                throw new Exception("Unknown Case Error", 1);
-
+                throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
                 break;
         }
     }
@@ -582,7 +585,7 @@ class FastAuth
             $uid = $this->_randomStr(self::UID_LENGTH);
         }
         if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
-            throw new Exception("A user alerady exist", 3);
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         return $this->_insertTemp($uid, self::CASE_NEW_USER, $params);
     }
@@ -590,7 +593,7 @@ class FastAuth
     private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false)
     {
         if ($checkIsUidExist && !$this->_isUserExist('uid', $uid)) { //check krna hai aur user exist nahi karta to
-            throw new Exception("No user exist with given uid", 3);
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         $key = $this->_randomStr(self::KEY_LENGTH);
         $currentDate = $this->_getCurrentTimeForMySQL();
@@ -604,7 +607,7 @@ class FastAuth
         }
 
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         return $key;
     }
@@ -616,15 +619,15 @@ class FastAuth
         $query = "SELECT $columns FROM `fast_auth_temp` WHERE `key` = '$key'";
         $res = $this->db->query($query);
         if (!$res) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         if (!$res->num_rows) {
-            throw new Exception("This key isn't exist", 1);
+            throw new Exception(self::ERROR_KEY_INVALID_MSG, self::ERROR_KEY_INVALID_CODE);
         }
         if ($row = $res->fetch_assoc()) {
             return $row;
         } else {
-            throw new Exception("Unknown Error Occur", 1);
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
 
@@ -632,9 +635,9 @@ class FastAuth
     {
 
         if (isset($params['mobile']) && $this->_isUserExist('mobile', $params['mobile'])) {
-            throw new Exception("A user alerady exists with same mobile", 3);
+            throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         } elseif (isset($params['email']) && $this->_isUserExist('email', $params['email'])) {
-            throw new Exception("A user alerady exists with same email", 3);
+            throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
 
         // unset($params['case']);
@@ -651,18 +654,18 @@ class FastAuth
         $currentTime = $this->_getCurrentTimeForMySQL();
         $query = "INSERT INTO `fast_auth_users` ($colums `uid`, `createdAt`, `passwordUpdatedAt`) VALUES ($values '$uid', '$currentTime', '$currentTime');";
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
     }
     private function _signIn(string $key, string $value, string $password = null, array $deviceJson = null)
     {
         $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', $key, $value);
         if ($userArray == null) {
-            throw new Exception("No user Exists with this $key", 1);
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         } elseif ($key !== 'uid' && !password_verify($password, $userArray['passwordHash'])) {
-            throw new Exception("Incorrect Password", 1);
+            throw new Exception(self::ERROR_PASSWORD_INCORRECT_MSG, self::ERROR_PASSWORD_INCORRECT_CODE);
         } elseif ($userArray['disabled'] == 1) {
-            throw new Exception("This user is disabled", 1);
+            throw new Exception(self::ERROR_USER_DISABLED_MSG, self::ERROR_USER_DISABLED_CODE);
         } else {
             return $this->_tokenSignIn($userArray['uid'], false, $deviceJson);
         }
@@ -684,7 +687,7 @@ class FastAuth
         }
 
         if (!$this->db->query($query)) {
-            throw new Exception(self::ERROR_MYSQLI_QUERY_MSG, self::ERROR_MYSQLI_QUERY_CODE);
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
         return [
             'uid' => $uid,
