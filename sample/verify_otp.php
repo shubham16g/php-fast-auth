@@ -47,7 +47,7 @@ try {
 
         header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
     } elseif (isset($_POST['resend'])) {
-        $otpArr = $auth->getResendOTP($key);
+        $otpArr = $auth->getOTP($key);
         /* $otpArr = [
             otp => <string> '865454',
             sendTo => <string> '+917778887778',

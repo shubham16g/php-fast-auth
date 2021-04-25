@@ -25,7 +25,7 @@ if (isset($_POST['submit'])) {
             $key = $auth->requestUpdatePasswordWithEmail($_POST['email']);
         }
 
-        $otpArr = $auth->generateOTP($key);
+        $otpArr = $auth->getOTP($key);
         /* $otpArr = [
             otp => <string> '865454',
             sendTo => <string> '+917778887778',

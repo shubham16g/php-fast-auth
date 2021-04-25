@@ -36,7 +36,7 @@ try {
             header("Location: index.php");
             die();
         }
-        $otpArr = $auth->generateOTP($key);
+        $otpArr = $auth->getOTP($key);
         /* $otpArr = [
             otp => <string> '865454',
             sendTo => <string> '+917778887778',

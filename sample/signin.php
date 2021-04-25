@@ -30,7 +30,7 @@ if (isset($_POST['submit'])) {
         header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();
-        die();
+        die($e);
     }
 }
 ?>
