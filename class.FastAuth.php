@@ -1,10 +1,10 @@
 <?php
 /*
 Fast-Auth 
-Version: 0.8 Beta
+Version: 0.9 Beta
 Developer: Shubham Gupta
 Licence: MIT
-Last Updated: 25 April, 2021 at 10:27 AM UTC +5:30
+Last Updated: 17 May, 2021 at 12:00 PM UTC +5:30
 */
 class FastAuth
 {
