@@ -138,7 +138,43 @@ class FastAuth
         }
     }
 
+    public function forceNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    {
+        if ($this->_isUserExist('email', $email)) {
+            throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
+        }
+        if ($uid == null) {
+            $uid = $this->_randomStr(self::UID_LENGTH);
+        }
+        if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
+        }
+        $params = ['email' => $email];
+        $params['password'] = $password;
+        $params['name'] = $name;
+        $params['profileURL'] = $profileURL;
+        $params['extraJson'] = $extraJson;
+        return $this->_insertUser($params, $uid);
+    }
 
+    public function forceNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    {
+        if ($this->_isUserExist('mobile', $mobile)) {
+            throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
+        }
+        if ($uid == null) {
+            $uid = $this->_randomStr(self::UID_LENGTH);
+        }
+        if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
+        }
+        $params = ['mobile' => $mobile];
+        $params['password'] = $password;
+        $params['name'] = $name;
+        $params['profileURL'] = $profileURL;
+        $params['extraJson'] = $extraJson;
+        return $this->_insertUser($params, $uid);
+    }
 
     public function requestNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
@@ -149,7 +185,7 @@ class FastAuth
     }
     public function requestNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
-        if ($this->_isUserExist('email', $mobile)) {
+        if ($this->_isUserExist('mobile', $mobile)) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
         return $this->_newTempUser(['mobile' => $mobile], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
@@ -290,6 +326,21 @@ class FastAuth
         return $array;
     }
     // *************************************** User Edits ***********-******-*-*--*-**********
+
+    public function forceUpdateMobile(string $uid, string $newMobile)
+    {
+        if ($this->_isUserExist('mobile', $newMobile)) {
+            throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
+        }
+        $this->_updateUser(['mobile' => $newMobile], $uid);
+    }
+    public function forceUpdateEmail(string $uid, string $newEmail)
+    {
+        if ($this->_isUserExist('email', $newEmail)) {
+            throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
+        }
+        $this->_updateUser(['email' => $newEmail], $uid);
+    }
 
     public function requestUpdateMobile(string $uid, string $newMobile)
     {
@@ -457,7 +508,6 @@ class FastAuth
             throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
-    // todo make it private
     private function _isUserExist(string $key, string $value)
     {
         try {
@@ -468,7 +518,6 @@ class FastAuth
         }
     }
 
-    // todo
     private function _handleVerifySuccess(string $key)
     {
         $row = $this->_getKeyData($key, '*');
@@ -553,9 +602,8 @@ class FastAuth
         }
     }
 
-    private function _insertUser(array $params, string $uid = null)
+    private function _insertUser(array $params, string $uid)
     {
-
         if (isset($params['mobile']) && $this->_isUserExist('mobile', $params['mobile'])) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         } elseif (isset($params['email']) && $this->_isUserExist('email', $params['email'])) {
@@ -571,10 +619,14 @@ class FastAuth
                 continue;
             }
             $colums .= "`$key`,";
+            if ($key === 'extraJson') {
+                $value = json_encode($value);
+            }
             $values .= "'$value',";
         }
         $currentTime = $this->_getCurrentTimeForMySQL();
-        $query = "INSERT INTO `fast_auth_users` ($colums `uid`, `createdAt`, `passwordUpdatedAt`) VALUES ($values '$uid', '$currentTime', '$currentTime');";
+        $query = "INSERT INTO `fast_auth_users` ($colums `uid`, `createdAt`, `passwordUpdatedAt`) VALUES 
+        ($values '$uid', '$currentTime', '$currentTime');";
         if (!$this->db->query($query)) {
             throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
