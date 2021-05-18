@@ -4,7 +4,7 @@ Fast-Auth
 Version: 0.9 Beta
 Developer: Shubham Gupta
 Licence: MIT
-Last Updated: 17 May, 2021 at 12:00 PM UTC +5:30
+Last Updated: 18 May, 2021 at 1:57 PM UTC +5:30
 */
 class FastAuth
 {
@@ -99,6 +99,7 @@ class FastAuth
             `name` VARCHAR(255) NULL ,
             `profileURL` VARCHAR(255) NULL ,
             `disabled` TINYINT(1) NOT NULL default 0 ,
+            `type` TINYINT(1) NOT NULL default 0 ,
             `createdAt` DATETIME NOT NULL ,
             `passwordUpdatedAt` DATETIME NOT NULL ,
             `isAnonymous` TINYINT(1) NOT NULL default 0,
@@ -138,57 +139,59 @@ class FastAuth
         }
     }
 
-    public function forceNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    public function forceNewUserWithEmail(string $email, string $password, string $name, int $type = 0, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
-        if ($this->_isUserExist('email', $email)) {
+        if ($this->_isUserExist('email', $email, $type)) {
             throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
         if ($uid == null) {
             $uid = $this->_randomStr(self::UID_LENGTH);
         }
-        if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+        if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
             throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         $params = ['email' => $email];
         $params['password'] = $password;
         $params['name'] = $name;
+        $params['type'] = $type;
         $params['profileURL'] = $profileURL;
         $params['extraJson'] = $extraJson;
         return $this->_insertUser($params, $uid);
     }
 
-    public function forceNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    public function forceNewUserWithMobile(string $mobile, string $password, string $name, int $type = 0, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
-        if ($this->_isUserExist('mobile', $mobile)) {
+        if ($this->_isUserExist('mobile', $mobile, $type)) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
         if ($uid == null) {
             $uid = $this->_randomStr(self::UID_LENGTH);
         }
-        if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+        if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
             throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         $params = ['mobile' => $mobile];
         $params['password'] = $password;
         $params['name'] = $name;
+        $params['type'] = $type;
         $params['profileURL'] = $profileURL;
         $params['extraJson'] = $extraJson;
         return $this->_insertUser($params, $uid);
     }
 
-    public function requestNewUserWithEmail(string $email, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    public function requestNewUserWithEmail(string $email, string $password, string $name, int $type = 0, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
-        if ($this->_isUserExist('email', $email)) {
+        if ($this->_isUserExist('email', $email, $type)) {
             throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
-        return $this->_newTempUser(['email' => $email], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
+        return $this->_newTempUser(['email' => $email, 'type' => $type], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
     }
-    public function requestNewUserWithMobile(string $mobile, string $password, string $name, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+    public function requestNewUserWithMobile(string $mobile, string $password, string $name, int $type = 0, string $profileURL = null, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
     {
-        if ($this->_isUserExist('mobile', $mobile)) {
+        if ($this->_isUserExist('mobile', $mobile, $type)) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
-        return $this->_newTempUser(['mobile' => $mobile], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
+        return $this->_newTempUser(['mobile' => $mobile, 'type' => $type], $password, $name, $profileURL, $extraJson, $uid, $isAnonymous);
     }
 
     public function getOTP(string $key)
@@ -252,43 +255,53 @@ class FastAuth
         ], $uid);
         return $this->_tokenSignIn($uid, true, $deviceJson);
     }
-    public function signInWithEmailAndPassword(string $email, string $password, array $deviceJson = null)
+    public function signInWithEmailAndPassword(string $email, string $password, int $type = 0, array $deviceJson = null)
     {
-        return $this->_signIn('email', $email, $password, $deviceJson);
+        return $this->_signIn('email', $email, $type, $password, $deviceJson);
     }
-    public function signInWithMobileAndPassword(string $mobile, string $password, array $deviceJson = null)
+    public function signInWithMobileAndPassword(string $mobile, string $password, int $type = 0, array $deviceJson = null)
     {
-        return $this->_signIn('mobile', $mobile, $password, $deviceJson);
+        return $this->_signIn('mobile', $mobile, $type, $password, $deviceJson);
     }
     public function signInWithUidAndPassword(string $uid, string $password, array $deviceJson = null)
     {
-        return $this->_signIn('uid', $uid, $password, $deviceJson);
+        return $this->_signIn('uid', $uid, -11, $password, $deviceJson);
     }
     public function forceSignIn(string $uid, array $deviceJson = null)
     {
-        return $this->_signIn('uid', $uid, null, $deviceJson);
+        return $this->_signIn('uid', $uid, -11, null, $deviceJson);
     }
 
     // ***********5*885*ad5sff*8f*a/8d*f/---------GET USER --------asdfa46546****asdf*a*dsf**adsf********
     public function getUser(string $uid)
     {
-        return $this->_getPrivateUser('*', 'uid', $uid);
+        return $this->_getPrivateUserWithUID('*', $uid);
     }
     public function getExtraJson(string $uid)
     {
-        return $this->_getPrivateUser('extraJson', 'uid', $uid);
+        return $this->_getPrivateUserWithUID('extraJson', $uid);
     }
     public function isValidUser(string $uid)
     {
-        return $this->_isUserExist('uid', $uid);
+        return $this->_isUserExistWithUID($uid);
     }
-    public function getUserByMobileNumber(string $mobile)
+    public function getUserByMobileNumber(string $mobile, int $type = 0)
     {
-        return $this->_getPrivateUser('*', 'mobile', $mobile);
+        return $this->_getPrivateUser('*', 'mobile', $mobile, $type);
     }
-    public function getUserByEmail(string $email)
+    public function getUserByEmail(string $email, int $type = 0)
     {
-        return $this->_getPrivateUser('*', 'email', $email);
+        return $this->_getPrivateUser('*', 'email', $email, $type);
+    }
+
+    public function getUserType(string $uid)
+    {
+        $userArr = $this->_getPrivateUserWithUID('type', $uid);
+        if ($userArr != null && sizeof($userArr) > 0) {
+            return $userArr[0]['type'];
+        } else {
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
+        }        
     }
 
     public function getUsersCount()
@@ -327,47 +340,47 @@ class FastAuth
     }
     // *************************************** User Edits ***********-******-*-*--*-**********
 
-    public function forceUpdateMobile(string $uid, string $newMobile)
+    public function forceUpdateMobile(string $uid, string $newMobile, int $type = 0)
     {
-        if ($this->_isUserExist('mobile', $newMobile)) {
+        if ($this->_isUserExist('mobile', $newMobile, $type)) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
         $this->_updateUser(['mobile' => $newMobile], $uid);
     }
-    public function forceUpdateEmail(string $uid, string $newEmail)
+    public function forceUpdateEmail(string $uid, string $newEmail, int $type = 0)
     {
-        if ($this->_isUserExist('email', $newEmail)) {
+        if ($this->_isUserExist('email', $newEmail, $type)) {
             throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
         $this->_updateUser(['email' => $newEmail], $uid);
     }
 
-    public function requestUpdateMobile(string $uid, string $newMobile)
+    public function requestUpdateMobile(string $uid, string $newMobile, int $type = 0)
     {
-        if ($this->_isUserExist('mobile', $newMobile)) {
+        if ($this->_isUserExist('mobile', $newMobile, $type)) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
         }
-        $row = $this->_getPrivateUser('name', 'uid', $uid);
+        $row = $this->_getPrivateUserWithUID('name', $uid);
         return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['mobile' => $newMobile, 'name' => $row['name']], true);
     }
 
-    public function requestUpdateEmail(string $uid, string $newEmail)
+    public function requestUpdateEmail(string $uid, string $newEmail, int $type = 0)
     {
-        if ($this->_isUserExist('email', $newEmail)) {
+        if ($this->_isUserExist('email', $newEmail, $type)) {
             throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
-        $row = $this->_getPrivateUser('name', 'uid', $uid);
+        $row = $this->_getPrivateUserWithUID('name', $uid);
         return $this->_insertTemp($uid, self::CASE_UPDATE_EMAIL, ['email' => $newEmail, 'name' => $row['name']], true);
     }
-    public function requestUpdatePasswordWithEmail(string $email)
+    public function requestUpdatePasswordWithEmail(string $email, int $type = 0)
     {
-        $row = $this->_getPrivateUser('uid, name', 'email', $email);
+        $row = $this->_getPrivateUser('uid, name', 'email', $email, $type);
         return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['email' => $email, 'name' => $row['name']], true);
     }
 
-    public function requestUpdatePasswordWithMobile(string $mobile)
+    public function requestUpdatePasswordWithMobile(string $mobile, int $type = 0)
     {
-        $row = $this->_getPrivateUser('uid, name', 'mobile', $mobile);
+        $row = $this->_getPrivateUser('uid, name', 'mobile', $mobile, $type);
         return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['mobile' => $mobile, 'name' => $row['name']], true);
     }
 
@@ -387,7 +400,7 @@ class FastAuth
 
     public function updatePasswordWithCurrentPassword(string $uid, string $currentPassword, string $newPassword)
     {
-        $row = $this->_getPrivateUser('passwordHash', 'uid', $uid);
+        $row = $this->_getPrivateUserWithUID('passwordHash', $uid);
         if (!password_verify($currentPassword, $row['passwordHash'])) {
             throw new Exception(self::ERROR_PASSWORD_INCORRECT_MSG, self::ERROR_PASSWORD_INCORRECT_CODE);
         }
@@ -492,9 +505,9 @@ class FastAuth
         return true;
     }
 
-    private function _getPrivateUser(string $columns, string $key, string $value)
+    private function _getPrivateUserWithUID(string $columns, string $uid)
     {
-        $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value'";
+        $query = "SELECT $columns FROM `fast_auth_users` WHERE `uid` = '$uid'";
         $res = $this->db->query($query);
         if (!$res) {
             throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
@@ -508,10 +521,36 @@ class FastAuth
             throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
         }
     }
-    private function _isUserExist(string $key, string $value)
+
+    private function _getPrivateUser(string $columns, string $key, string $value, int $type)
+    {
+        $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value' AND `type` = $type";
+        $res = $this->db->query($query);
+        if (!$res) {
+            throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
+        }
+        if (!$res->num_rows) {
+            throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
+        }
+        if ($row = $res->fetch_assoc()) {
+            return $row;
+        } else {
+            throw new Exception(self::D_ERROR_UNKNOWN_MSG, self::ERROR_CODE);
+        }
+    }
+    private function _isUserExist(string $key, string $value, int $type)
     {
         try {
-            $this->_getPrivateUser('uid', $key, $value);
+            $this->_getPrivateUser('uid', $key, $value, $type);
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+    private function _isUserExistWithUID(string $uid)
+    {
+        try {
+            $this->_getPrivateUserWithUID('uid', $uid);
             return true;
         } catch (Exception $e) {
             return false;
@@ -535,7 +574,7 @@ class FastAuth
                 break;
             case self::CASE_UPDATE_EMAIL:
             case self::CASE_UPDATE_MOBILE:
-                $this->_updateUser($data, $row['uid']);
+                $this->_updateUser($data, $row['uid'], $this->_getPrivateUserWithUID('type', $row['uid']));
                 return ['case' => $row['case']];
                 break;
             default:
@@ -553,7 +592,7 @@ class FastAuth
         if ($uid == null) {
             $uid = $this->_randomStr(self::UID_LENGTH);
         }
-        if (!$isAnonymous && $this->_isUserExist('uid', $uid)) {
+        if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
             throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         return $this->_insertTemp($uid, self::CASE_NEW_USER, $params);
@@ -561,7 +600,7 @@ class FastAuth
 
     private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false)
     {
-        if ($checkIsUidExist && !$this->_isUserExist('uid', $uid)) { //check krna hai aur user exist nahi karta to
+        if ($checkIsUidExist && !$this->_isUserExistWithUID($uid)) { //check krna hai aur user exist nahi karta to
             throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         }
         $key = $this->_randomStr(self::KEY_LENGTH);
@@ -582,7 +621,7 @@ class FastAuth
         }
         return $key;
     }
-    private function _getKeyData(string $key, string $columns = null)
+    private function _getKeyData(string $key, string $columns)
     {
         if ($columns === null) {
             $columns = '`case`';
@@ -604,9 +643,9 @@ class FastAuth
 
     private function _insertUser(array $params, string $uid)
     {
-        if (isset($params['mobile']) && $this->_isUserExist('mobile', $params['mobile'])) {
+        if (isset($params['mobile']) && $this->_isUserExist('mobile', $params['mobile'], $params['type'])) {
             throw new Exception(self::ERROR_MOBILE_ALREADY_EXISTS_MSG, self::ERROR_MOBILE_ALREADY_EXISTS_CODE);
-        } elseif (isset($params['email']) && $this->_isUserExist('email', $params['email'])) {
+        } elseif (isset($params['email']) && $this->_isUserExist('email', $params['email'], $params['type'])) {
             throw new Exception(self::ERROR_EMAIL_ALREADY_EXISTS_MSG, self::ERROR_EMAIL_ALREADY_EXISTS_CODE);
         }
 
@@ -631,9 +670,14 @@ class FastAuth
             throw new Exception(self::D_ERROR_MYSQLI_QUERY_MSG, self::ERROR_CODE);
         }
     }
-    private function _signIn(string $key, string $value, string $password = null, array $deviceJson = null)
+    private function _signIn(string $key, string $value, int $type, string $password = null, array $deviceJson = null)
     {
-        $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', $key, $value);
+        $userArray = null;
+        if ($type == -11) {
+            $userArray = $this->_getPrivateUserWithUID('passwordHash, uid, disabled', $value);
+        } else {
+            $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', $key, $value, $type);
+        }
         if ($userArray == null) {
             throw new Exception(self::ERROR_USER_NOT_EXIST_MSG, self::ERROR_USER_NOT_EXIST_CODE);
         } elseif ($key !== 'uid' && !password_verify($password, $userArray['passwordHash'])) {
@@ -717,7 +761,7 @@ class FastAuth
     {
         $newArr = [];
         foreach ($array as $key => $value) {
-            if ($value == null) {
+            if ($value === null) {
                 continue;
             }
             if ($key === 'password') {

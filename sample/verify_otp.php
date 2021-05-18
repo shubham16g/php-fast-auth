@@ -26,8 +26,10 @@ try {
                 die();
                 break;
             case FastAuth::CASE_NEW_USER:
+                echo "we are here";
                 $uid = $result['uid'];
                 $signInResult = $auth->forceSignIn($uid);
+                echo "walla";
                 $_SESSION['uid'] = $signInResult['uid'];
                 $_SESSION['token'] = $signInResult['token'];
                 $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
