@@ -1,7 +1,7 @@
 <?php
 session_start();
-require '../class.FastAuth.php';
-require './autoload.php';
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
 
 if (!isset($_GET['key'])) {
     die('Error');
@@ -9,7 +9,7 @@ if (!isset($_GET['key'])) {
 $key = $_GET['key'];
 
 try {
-    $auth = new FastAuth($db);
+    $auth = new PHPFastAuth($db);
     if (isset($_POST['submit'])) {
 
         $title = '';
@@ -20,12 +20,12 @@ try {
         $result = $auth->verifyOTP($key, $otp);
 
         switch ($result['case']) {
-            case FastAuth::CASE_UPDATE_PASSWORD:
+            case PHPFastAuth::CASE_UPDATE_PASSWORD:
                 $passwordUpdateKey = $result['passwordUpdateKey'];
                 header("Location: reset_password.php?passwordUpdateKey=" . urlencode($passwordUpdateKey));
                 die();
                 break;
-            case FastAuth::CASE_NEW_USER:
+            case PHPFastAuth::CASE_NEW_USER:
                 echo "we are here";
                 $uid = $result['uid'];
                 $signInResult = $auth->forceSignIn($uid);
@@ -36,10 +36,10 @@ try {
                 // $content = json_encode($signInResult);
                 $title = "Account verification successful";
                 break;
-            case FastAuth::CASE_UPDATE_EMAIL:
+            case PHPFastAuth::CASE_UPDATE_EMAIL:
                 $title = "Email update successful";
                 break;
-            case FastAuth::CASE_UPDATE_MOBILE:
+            case PHPFastAuth::CASE_UPDATE_MOBILE:
                 $title = "Mobile number update successful";
                 break;
             default:

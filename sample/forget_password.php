@@ -1,23 +1,20 @@
 <?php
 
-use FastAuth\Options;
-
 if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
+
 $countryCodeList = ['+91', '+1', '+12', '+2'];
-
-require '../class.FastAuth.php';
-require './autoload.php';
-
 
 
 if (isset($_POST['submit'])) {
 
-    
+
     try {
-        $auth = new FastAuth($db);
+        $auth = new PHPFastAuth($db);
         $key;
         if (isset($_POST['mobile'])) {
             $key = $auth->requestUpdatePasswordWithMobile($_POST['mobile']);

@@ -7,8 +7,8 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
-require '../class.FastAuth.php';
-require './autoload.php';
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
 
 if (isset($_POST['submit'])) {
     
@@ -16,7 +16,7 @@ if (isset($_POST['submit'])) {
     
     // todo validate these post methods
     try {
-        $auth = new FastAuth($db);
+        $auth = new PHPFastAuth($db);
         $signInResult;
         if (isset($_POST['mobile'])) {
             $signInResult = $auth->signInWithMobileAndPassword($_POST['mobile'], $password);

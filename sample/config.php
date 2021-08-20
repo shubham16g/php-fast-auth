@@ -3,6 +3,6 @@
 $host = 'localhost'; 
 $username = 'root';
 $password = '';
-$dbname = 'eleamapi';
+$dbname = 'test';
 
 $db = new mysqli($host, $username, $password, $dbname);

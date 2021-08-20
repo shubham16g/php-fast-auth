@@ -4,8 +4,8 @@ if (isset($_GET['passwordUpdateKey'])) {
     $withKey = true;
 }
 
-require '../class.FastAuth.php';
-require './autoload.php';
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
 
 
 if (isset($_POST['submit'])) {
@@ -14,7 +14,7 @@ if (isset($_POST['submit'])) {
     } elseif (isset($_GET['passwordUpdateKey'])) {
         $passwordUpdateKey = $_GET['passwordUpdateKey'];
         try {
-            $auth = new FastAuth($db);
+            $auth = new PHPFastAuth($db);
             $auth->updatePassword($passwordUpdateKey, $_POST['password']);
             // $auth->signOutAllDevices($uid);
 

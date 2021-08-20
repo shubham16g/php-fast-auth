@@ -7,8 +7,8 @@ if (isset($_SESSION['uid']) && isset($_SESSION['token'])) {
     header("Location: index.php");
 }
 
-require '../class.FastAuth.php';
-require './autoload.php';
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
 
 if (isset($_POST['submit'])) {
 
@@ -17,7 +17,7 @@ if (isset($_POST['submit'])) {
 
     $key;
     try {
-        $auth = new FastAuth($db);
+        $auth = new PHPFastAuth($db);
         if (isset($_POST['mobile'])) {
             $key = $auth->requestNewUserWithMobile($_POST['mobile'], $password, $name);
         } else {

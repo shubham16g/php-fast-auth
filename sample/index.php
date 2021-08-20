@@ -5,13 +5,13 @@ session_start();
 if (!isset($_SESSION['uid']) || !isset($_SESSION['token'])) {
     header("Location: signin.php");
 }
-require '../class.FastAuth.php';
-require './autoload.php';
+require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
+require_once dirname(__FILE__, 1) . '/config.php';
 
 
 $userData;
 try {
-    $auth = new FastAuth($db);
+    $auth = new PHPFastAuth($db);
     $uid = $_SESSION['uid'];
     $auth->verifyToken($_SESSION['token']);
     $userData = $auth->getUser($uid);
@@ -22,8 +22,6 @@ try {
         header("Location: update.php?type=email");
     } elseif (isset($_POST['updateName'])) {
         header("Location: update.php?type=name");
-    } elseif (isset($_POST['updateProfileURL'])) {
-        header("Location: update.php?type=profile%20url");
     }
 } catch (Exception $e) {
     echo $e->getMessage();
@@ -48,7 +46,6 @@ try {
         <input type="submit" name="updateEmail" value="<?= ($userData['email'] != null) ? 'Update Email' : "Link Email"; ?>" class="btn">
         <input type="submit" name="updateMobile" value="<?= ($userData['mobile'] != null) ? 'Update Mobile' : "Link Mobile"; ?>" class="btn">
         <input type="submit" name="updateName" value="<?= ($userData['name'] != null) ? 'Update Name' : "Add Name"; ?>" class="btn">
-        <input type="submit" name="updateProfileURL" value="<?= ($userData['profileURL'] != null) ? 'Update Profile URL' : "Add Profile URL"; ?>" class="btn">
     </form>
     <a href="./signout.php" class="btn">Sign out</a>
 
