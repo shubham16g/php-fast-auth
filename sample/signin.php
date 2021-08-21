@@ -17,12 +17,14 @@ if (isset($_POST['submit'])) {
     // todo validate these post methods
     try {
         $auth = new PHPFastAuth($db);
-        $signInResult;
+        $signIn = null;
         if (isset($_POST['mobile'])) {
-            $signInResult = $auth->signInWithMobileAndPassword($_POST['mobile'], $password);
+            $signIn = new PHPFastAuth\SignInWithMobile($_POST['mobile']);
         } else {
-            $signInResult = $auth->signInWithEmailAndPassword($_POST['email'], $password);
+            $signIn = new PHPFastAuth\SignInWithEmail($_POST['email']);
         }
+        $signIn->setPassword($password);
+        $signInResult = $auth->signIn($signIn);
 
         $_SESSION['uid'] = $signInResult['uid'];
         $_SESSION['token'] = $signInResult['token'];
@@ -30,7 +32,7 @@ if (isset($_POST['submit'])) {
         header("Location: ./index.php");
     } catch (Exception $e) {
         echo $e->getMessage();
-        die($e);
+        die();
     }
 }
 ?>

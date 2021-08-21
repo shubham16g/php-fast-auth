@@ -17,20 +17,20 @@ if (isset($_POST['submit'])) {
         $auth = new PHPFastAuth($db);
         $key;
         if (isset($_POST['mobile'])) {
-            $key = $auth->requestUpdatePasswordWithMobile($_POST['mobile']);
+            $key = $auth->resetPasswordRequestWithMobile($_POST['mobile']);
         } else {
-            $key = $auth->requestUpdatePasswordWithEmail($_POST['email']);
+            $key = $auth->resetPasswordRequestWithEmail($_POST['email']);
         }
 
-        $otpArr = $auth->getOTP($key);
-        /* $otpArr = [
-            otp => <string> '865454',
-            sendTo => <string> '+917778887778',
-            sendType => <string> 'mobile',
-        ] */
+        $otpData = $auth->decodeOTP($key);
 
-        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
+        $title = '';
+        if ($otpData->getType() === 'mobile') {
+            $title = urlencode("OTP sent to Mobile No. : " . $otpData->getMobile());
+        } else {
+            $title = urlencode("OTP sent to Email : " . $otpData->getEmail());
+        }
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpData->getOTP());
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         die();

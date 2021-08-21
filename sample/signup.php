@@ -18,22 +18,28 @@ if (isset($_POST['submit'])) {
     $key;
     try {
         $auth = new PHPFastAuth($db);
+
+        $signUp = null;
         if (isset($_POST['mobile'])) {
-            $key = $auth->requestNewUserWithMobile($_POST['mobile'], $password, $name);
+            $signUp = new PHPFastAuth\SignUpWithMobile($_POST['mobile']);
         } else {
-            $key = $auth->requestNewUserWithEmail($_POST['email'], $password, $name);
+            $signUp = new PHPFastAuth\SignUpWithEmail($_POST['email']);
         }
+        $signUp->setName($name);
+        $signUp->setPassword($password);
 
-        $otpArr = $auth->getOTP($key);
-        /* $otpArr = [
-            otp => <string> '865454',
-            sendTo => <string> '+917778887778',
-            sendType => <string> 'mobile',
-            name => <string> 'Shubham Gupta',
-        ] */
+        $key = $auth->signUpRequest($signUp);
 
-        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
+
+        $otpData = $auth->decodeOTP($key);
+
+        $title = '';
+        if ($otpData->getType() === 'mobile') {
+            $title = urlencode("OTP sent to Mobile No. : " . $otpData->getMobile());            
+        } else {
+            $title = urlencode("OTP sent to Email : " . $otpData->getEmail());            
+        }
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpData->getOTP());
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
         // header("Location: ./index.php");

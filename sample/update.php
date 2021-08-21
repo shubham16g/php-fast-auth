@@ -24,23 +24,23 @@ try {
     if (isset($_POST['submit'])) {
         $key;
         if ($type === 'mobile') {
-            $key = $auth->requestUpdateMobile($uid, $_POST['mobile']);
+            $key = $auth->updateMobileRequest($uid, $_POST['mobile']);
         } elseif ($type === 'email') {
-            $key = $auth->requestUpdateEmail($uid, $_POST['email']);
+            $key = $auth->updateEmailRequest($uid, $_POST['email']);
         } elseif ($type === 'name') {
             $auth->updateName($uid, $_POST['text']);
             header("Location: index.php");
             die();
         }
-        $otpArr = $auth->getOTP($key);
-        /* $otpArr = [
-            otp => <string> '865454',
-            sendTo => <string> '+917778887778',
-            sendType => <string> 'mobile',
-        ] */
+        $otpData = $auth->decodeOTP($key);
 
-        $title = urlencode("OTP sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
+        $title = '';
+        if ($otpData->getType() === 'mobile') {
+            $title = urlencode("OTP sent to Mobile No. : " . $otpData->getMobile());
+        } else {
+            $title = urlencode("OTP sent to Email : " . $otpData->getEmail());
+        }
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpData->getOTP());
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
     }

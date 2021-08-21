@@ -1,4 +1,5 @@
 <?php
+
 session_start();
 require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
 require_once dirname(__FILE__, 1) . '/config.php';
@@ -26,10 +27,8 @@ try {
                 die();
                 break;
             case PHPFastAuth::CASE_NEW_USER:
-                echo "we are here";
-                $uid = $result['uid'];
-                $signInResult = $auth->forceSignIn($uid);
-                echo "walla";
+                $signIn = new PHPFastAuth\SignInWithUID($result['uid']);
+                $signInResult = $auth->signInWithoutPassword($signIn);
                 $_SESSION['uid'] = $signInResult['uid'];
                 $_SESSION['token'] = $signInResult['token'];
                 $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
@@ -49,24 +48,21 @@ try {
 
         header("Location: message.php?title=" . urlencode($title) . '&content=' . urlencode($content) . '&redirect=' . urlencode($redirect));
     } elseif (isset($_POST['resend'])) {
-        $otpArr = $auth->getOTP($key);
-        /* $otpArr = [
-            otp => <string> '865454',
-            sendTo => <string> '+917778887778',
-            sendType => <string> 'mobile',
-        ] */
+        $otpData = $auth->decodeOTP($key);
 
-        $title = urlencode("OTP re-sent to " . $otpArr['sendType'] . ': ' . $otpArr['sendTo']);
-        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpArr['otp']);
+        $title = '';
+        if ($otpData->getType() === 'mobile') {
+            $title = urlencode("OTP re-sent to Mobile No. : " . $otpData->getMobile());
+        } else {
+            $title = urlencode("OTP re-sent to Email : " . $otpData->getEmail());
+        }
+        $content = urlencode("Note: For testing purpose the otp is visible on this page. OTP: " . $otpData->getOTP());
         $redirect = urlencode("verify_otp.php?key=" . urlencode($key));
         header("Location: message.php?title=$title&content=$content&redirect=$redirect");
     }
 } catch (Exception $e) {
     die($e->getMessage());
 }
-
-
-
 
 ?>
 

@@ -9,7 +9,13 @@ Last Updated: 20 Aug, 2021 at 9:42 PM UTC +5:30
 
 namespace {
 
+    use PHPFastAuth\_SignIn;
     use PHPFastAuth\Options;
+    use PHPFastAuth\Errors;
+    use PHPFastAuth\OTPData;
+    use PHPFastAuth\_SignUp;
+    use PHPFastAuth\SignInWithUID;
+    use PHPFastAuth\Utils;
 
     class PHPFastAuth
     {
@@ -18,33 +24,17 @@ namespace {
         const FOR_VERIFY_MOBILE = 6;
         const FOR_VERIFY_CREATED_ACCOUNT = 5;
 
-        private const UID_LENGTH = 16;
-        private const TOKEN_LENGTH = 39;
-        private const KEY_LENGTH = 32;
-
         public const CASE_NEW_USER = 5;
         public const CASE_UPDATE_MOBILE = 6;
         public const CASE_UPDATE_EMAIL = 7;
         public const CASE_UPDATE_PASSWORD = 8;
         private const CASE_PRIVATE_PASSWORD_UPDATE = 9;
 
-
-        private function _setOptions(Options $option = null)
-        {
-            if ($option == null)
-                $option = new Options();
-            $this->OTPLength = $option->OTPLength;
-            $this->OTPCharacters = $option->OTPCharacters;
-            $this->keyExpiresIn = $option->keyExpiresIn;
-            $this->tokenExpirePeriod = $option->tokenExpirePeriod;
-            $this->decodeOTPAttempts = $option->decodeOTPAttempts;
-        }
-
         public function __construct(mysqli $db, Options $option = null)
         {
             $this->_setOptions($option);
             if ($db->connect_errno) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_CONNECT();
+                throw Errors::D_ERROR_MYSQLI_CONNECT();
             }
             $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
             $this->db = $db;
@@ -65,7 +55,7 @@ namespace {
             `createdAt` DATETIME NOT NULL ,
             `passwordUpdatedAt` DATETIME NOT NULL ,
             `isAnonymous` TINYINT(1) NOT NULL default 0,
-            `extraJson` JSON NULL ,
+            `extras` JSON NULL ,
             PRIMARY KEY (`uid`)
             ) AUTO_INCREMENT = 10000;";
 
@@ -91,145 +81,171 @@ namespace {
             );";
 
             if (!$this->db->query($createTempTable)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$this->db->query($createTokensTable)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$this->db->query($createUsersTable)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
         }
 
-        public function forceNewUserWithEmail(string $email, string $password, string $name, int $type = 0, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+        // todo return type
+        public function forceSignUp(_SignUp $signUp)
         {
-            if ($this->_isUserExist('email', $email, $type)) {
-                throw PHPFastAuth\Errors::ERROR_EMAIL_ALREADY_EXISTS();
-            }
-            if ($uid == null) {
-                $uid = $this->_randomStr(self::UID_LENGTH);
-            }
-            if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
-            }
-            $params = ['email' => $email];
-            $params['password'] = $password;
-            $params['name'] = $name;
-            $params['type'] = $type;
-            $params['extraJson'] = $extraJson;
-            return $this->_insertUser($params, $uid);
+            $params = $this->_validateSignUp($signUp);
+            return $this->_insertUser($signUp->uid, $params);
         }
 
-        public function forceNewUserWithMobile(string $mobile, string $password, string $name, int $type = 0, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+        public function signUpRequest(_SignUp $signUp): string
         {
-            if ($this->_isUserExist('mobile', $mobile, $type)) {
-                throw PHPFastAuth\Errors::ERROR_MOBILE_ALREADY_EXISTS();
-            }
-            if ($uid == null) {
-                $uid = $this->_randomStr(self::UID_LENGTH);
-            }
-            if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
-            }
-            $params = ['mobile' => $mobile];
-            $params['password'] = $password;
-            $params['name'] = $name;
-            $params['type'] = $type;
-            $params['extraJson'] = $extraJson;
-            return $this->_insertUser($params, $uid);
+            $params = $this->_validateSignUp($signUp);
+            return $this->_newTempUser($signUp, $params);
         }
 
-        public function requestNewUserWithEmail(string $email, string $password, string $name, int $type = 0, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+        private function _validateSignUp(_SignUp $signUp): array
         {
-            if ($this->_isUserExist('email', $email, $type)) {
-                throw PHPFastAuth\Errors::ERROR_EMAIL_ALREADY_EXISTS();
+            $params = [];
+            if ($signUp->mobile != null) {
+                if ($this->_isUserExist('mobile', $signUp->mobile, $signUp->type))
+                    throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                $params['mobile'] = $signUp->mobile;
+            } elseif ($signUp->email != null) {
+                if ($this->_isUserExist('email', $signUp->email, $signUp->type))
+                    throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                $params['email'] = $signUp->email;
+            } else {
+                throw Errors::ERROR_NO_EMIAL_OR_MOBILE_PROVIDED();
             }
-            return $this->_newTempUser(['email' => $email, 'type' => $type], $password, $name, $extraJson, $uid, $isAnonymous);
-        }
-        public function requestNewUserWithMobile(string $mobile, string $password, string $name, int $type = 0, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
-        {
-            if ($this->_isUserExist('mobile', $mobile, $type)) {
-                throw PHPFastAuth\Errors::ERROR_MOBILE_ALREADY_EXISTS();
+            if ($this->_isUserExistWithUID($signUp->uid)) {
+                throw Errors::ERROR_USER_NOT_EXIST();
             }
-            return $this->_newTempUser(['mobile' => $mobile, 'type' => $type], $password, $name, $extraJson, $uid, $isAnonymous);
+            // todo name, password, extras
+            $params['password'] = $signUp->password;
+            $params['name'] = $signUp->name;
+            $params['extras'] = $signUp->extras;
+            $params['type'] = $signUp->type;
+
+            return $params;
         }
 
-        public function getOTP(string $key)
+        public function decodeOTP(string $key): OTPData
         {
             $keyData = $this->_getKeyData($key, '*');
 
-            if (!$this->_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
-                throw PHPFastAuth\Errors::ERROR_KEY_EXPIRED();
+            if (!Utils::_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
+                throw Errors::ERROR_KEY_EXPIRED();
             }
             $attempts = $keyData['attempts'] + 1;
 
             if ($attempts > $this->decodeOTPAttempts) {
-                throw PHPFastAuth\Errors::ERROR_OTP_GET_ATTEMPTS();
+                throw Errors::ERROR_OTP_GET_ATTEMPTS();
             }
             $data = (array)json_decode($keyData['data']);
 
-            $sendTo = '';
-            $sendType = '';
+            $otpData = new OTPData(Utils::_decryptOTP($keyData['otpHash']), $keyData['case'], $data['name']);
+
+            // todo define golbal const type
             if (isset($data['mobile'])) {
-                $sendTo = $data['mobile'];
-                $sendType = 'mobile';
+                $otpData->mobile = $data['mobile'];
+                $otpData->type = 'mobile';
             } elseif (isset($data['email'])) {
-                $sendTo = $data['email'];
-                $sendType = 'email';
+                $otpData->email = $data['email'];
+                $otpData->type = 'email';
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
+                throw Errors::ERROR_NO_EMIAL_OR_MOBILE_PROVIDED();
             }
             $qz = "UPDATE `fast_auth_temp` SET attempts = $attempts WHERE `key` = '$key'";
             $this->db->query($qz);
 
-            return [
-                'otp' => $this->_decryptOTP($keyData['otpHash']),
-                'case' => $keyData['case'],
-                'sendTo' => $sendTo,
-                'name' => $data['name'],
-                'sendType' => $sendType
-            ];
+            return $otpData;
         }
 
         public function verifyOTP(string $key, string $otp)
         {
-            $otpHash = $this->_cryptOTP($otp);
+            $otpHash = Utils::_cryptOTP($otp);
             $keyData = $this->_getKeyData($key, 'createdAt, otpHash');
 
-            if (!$this->_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
-                throw PHPFastAuth\Errors::ERROR_KEY_EXPIRED();
+            if (!Utils::_isValidTimePeriod($keyData['createdAt'], $this->keyExpiresIn)) {
+                throw Errors::ERROR_KEY_EXPIRED();
             }
             if ($otpHash !== $keyData['otpHash']) {
-                throw PHPFastAuth\Errors::ERROR_OTP_INVALID();
+                throw Errors::ERROR_OTP_INVALID();
             }
             return $this->_handleVerifySuccess($key);
+        }
+        private function _handleVerifySuccess(string $key)
+        {
+            $row = $this->_getKeyData($key, '*');
+            // todo change * to column names
+            $data = (array) json_decode($row['data']);
+            $this->_clearTable('fast_auth_temp', 'key', $key);
+            switch ($row['case']) {
+                case self::CASE_NEW_USER:
+                    $this->_insertUser($row['uid'], $data);
+                    return ['case' => $row['case'], 'uid' => $row['uid']];
+                    break;
+                case self::CASE_UPDATE_PASSWORD:
+                    $passwordUpdateKey = $this->_insertTemp($row['uid'], self::CASE_PRIVATE_PASSWORD_UPDATE, null, true);
+                    return ['case' => $row['case'], 'passwordUpdateKey' => $passwordUpdateKey];
+                    break;
+                case self::CASE_UPDATE_EMAIL:
+                case self::CASE_UPDATE_MOBILE:
+                    $this->_updateUser($data, $row['uid']);
+                    return ['case' => $row['case']];
+                    break;
+                default:
+                    throw Errors::D_ERROR_UNKNOWN();
+                    break;
+            }
         }
 
         // **************************** SIGNIN PROCESS *-********************************----*******
 
         public function signInAnonymously(array $deviceJson = null)
         {
-            $uid = $this->_randomStr(self::UID_LENGTH);
-            $this->_insertUser([
-                'isAnonymous' => 1,
-            ], $uid);
+            $uid = Utils::randomUID();
+            $this->_insertUser(
+                $uid,
+                [
+                    'isAnonymous' => 1,
+                ]
+            );
             return $this->_tokenSignIn($uid, true, $deviceJson);
         }
-        public function signInWithEmailAndPassword(string $email, string $password, int $type = 0, array $deviceJson = null)
+
+        public function signIn(_SignIn $signIn)
         {
-            return $this->_signIn('email', $email, $type, $password, $deviceJson);
+            return $this->_signIn($signIn, false);
         }
-        public function signInWithMobileAndPassword(string $mobile, string $password, int $type = 0, array $deviceJson = null)
+
+        public function signInWithoutPassword(SignInWithUID $signIn)
         {
-            return $this->_signIn('mobile', $mobile, $type, $password, $deviceJson);
+            return $this->_signIn($signIn, true);
         }
-        public function signInWithUidAndPassword(string $uid, string $password, array $deviceJson = null)
+
+        private function _signIn(_SignIn $signIn, bool $forced)
         {
-            return $this->_signIn('uid', $uid, -11, $password, $deviceJson);
-        }
-        public function forceSignIn(string $uid, array $deviceJson = null)
-        {
-            return $this->_signIn('uid', $uid, -11, null, $deviceJson);
+            $userArray = null;
+            if ($signIn->uid != null) {
+                $userArray = $this->_getPrivateUserWithUID('passwordHash, uid, disabled', $signIn->uid);
+            } elseif ($signIn->mobile != null) {
+                $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', 'mobile', $signIn->mobile, $signIn->type);
+            } elseif ($signIn->email != null) {
+                $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', 'email', $signIn->email, $signIn->type);
+            } else {
+                throw Errors::ERROR_NO_EMIAL_OR_MOBILE_PROVIDED();
+            }
+            if ($userArray == null) {
+                throw Errors::ERROR_USER_NOT_EXIST();
+            } elseif (!$forced && !password_verify($signIn->password, $userArray['passwordHash'])) {
+                throw Errors::ERROR_PASSWORD_INCORRECT();
+            } elseif ($userArray['disabled'] == 1) {
+                throw Errors::ERROR_USER_DISABLED();
+            } else {
+                return $this->_tokenSignIn($userArray['uid'], false, null);
+            }
         }
 
         // ***********5*885*ad5sff*8f*a/8d*f/---------GET USER --------asdfa46546****asdf*a*dsf**adsf********
@@ -239,7 +255,7 @@ namespace {
         }
         public function getExtraJson(string $uid)
         {
-            return $this->_getPrivateUserWithUID('extraJson', $uid);
+            return $this->_getPrivateUserWithUID('extras', $uid);
         }
         public function isValidUser(string $uid)
         {
@@ -254,43 +270,43 @@ namespace {
             return $this->_getPrivateUser('*', 'email', $email, $type);
         }
 
-        public function getUserType(string $uid)
+        public function getUserType(string $uid): int
         {
             $userArr = $this->_getPrivateUserWithUID('type', $uid);
             if ($userArr != null && sizeof($userArr) > 0) {
                 return $userArr[0]['type'];
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
+                throw Errors::D_ERROR_UNKNOWN();
             }
         }
 
-        public function getUsersCount()
+        public function getUsersCount(): int
         {
             $query = "SELECT count(*) FROM `fast_auth_users`";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if ($row = $res->fetch_assoc()) {
                 return $row['count(*)'];
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
         }
-        public function getPagesCount(int $usersCount, int $usersPerPage = 20)
+        public function getPagesCount(int $usersCount, int $usersPerPage = 20): int
         {
             return ceil($usersCount / $usersPerPage);
         }
 
 
 
-        public function listUsers(int $page = 1, int $usersPerPage = 20, string $orderBy = 'createdAt DESC')
+        public function listUsers(int $page = 1, int $usersPerPage = 20, string $orderBy = 'createdAt DESC'): array
         {
             $offset = ($page - 1) * $usersPerPage;
             $query = "SELECT * FROM `fast_auth_users` ORDER BY $orderBy LIMIT $offset, $usersPerPage";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             $array = [];
             while ($row = $res->fetch_assoc()) {
@@ -303,58 +319,59 @@ namespace {
         public function forceUpdateMobile(string $uid, string $newMobile, int $type = 0)
         {
             if ($this->_isUserExist('mobile', $newMobile, $type)) {
-                throw PHPFastAuth\Errors::ERROR_MOBILE_ALREADY_EXISTS();
+                throw Errors::ERROR_MOBILE_ALREADY_EXISTS();
             }
             $this->_updateUser(['mobile' => $newMobile], $uid);
         }
         public function forceUpdateEmail(string $uid, string $newEmail, int $type = 0)
         {
             if ($this->_isUserExist('email', $newEmail, $type)) {
-                throw PHPFastAuth\Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
             }
             $this->_updateUser(['email' => $newEmail], $uid);
         }
 
-        public function requestUpdateMobile(string $uid, string $newMobile, int $type = 0)
+        public function updateMobileRequest(string $uid, string $newMobile, int $type = 0)
         {
             if ($this->_isUserExist('mobile', $newMobile, $type)) {
-                throw PHPFastAuth\Errors::ERROR_MOBILE_ALREADY_EXISTS();
+                throw Errors::ERROR_MOBILE_ALREADY_EXISTS();
             }
             $row = $this->_getPrivateUserWithUID('name', $uid);
             return $this->_insertTemp($uid, self::CASE_UPDATE_MOBILE, ['mobile' => $newMobile, 'name' => $row['name']], true);
         }
 
-        public function requestUpdateEmail(string $uid, string $newEmail, int $type = 0)
+        public function updateEmailRequest(string $uid, string $newEmail, int $type = 0)
         {
             if ($this->_isUserExist('email', $newEmail, $type)) {
-                throw PHPFastAuth\Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
             }
             $row = $this->_getPrivateUserWithUID('name', $uid);
             return $this->_insertTemp($uid, self::CASE_UPDATE_EMAIL, ['email' => $newEmail, 'name' => $row['name']], true);
         }
-        public function requestUpdatePasswordWithEmail(string $email, int $type = 0)
+
+        // Password Update and resets
+        public function resetPasswordRequestWithEmail(string $email, int $type = 0)
         {
             $row = $this->_getPrivateUser('uid, name', 'email', $email, $type);
             return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['email' => $email, 'name' => $row['name']], true);
         }
 
-        public function requestUpdatePasswordWithMobile(string $mobile, int $type = 0)
+        public function resetPasswordRequestWithMobile(string $mobile, int $type = 0)
         {
             $row = $this->_getPrivateUser('uid, name', 'mobile', $mobile, $type);
             return $this->_insertTemp($row['uid'], self::CASE_UPDATE_PASSWORD, ['mobile' => $mobile, 'name' => $row['name']], true);
         }
 
-
         public function updatePassword(string $passwordUpdateKey, string $newPassword)
         {
             $row = $this->_getKeyData($passwordUpdateKey, 'uid, createdAt');
-            if (!$this->_isValidTimePeriod($row['createdAt'], $this->keyExpiresIn)) {
-                throw PHPFastAuth\Errors::ERROR_KEY_EXPIRED();
+            if (Utils::_isValidTimePeriod($row['createdAt'], $this->keyExpiresIn)) {
+                throw Errors::ERROR_KEY_EXPIRED();
             }
             $this->_clearTable('fast_auth_temp', 'key', $passwordUpdateKey);
             return $this->_updateUser([
                 'passwordHash' => password_hash($newPassword, PASSWORD_BCRYPT),
-                'passwordUpdatedAt' => $this->_getCurrentTimeForMySQL()
+                'passwordUpdatedAt' => Utils::_getCurrentTimeForMySQL()
             ], $row['uid']);
         }
 
@@ -362,11 +379,11 @@ namespace {
         {
             $row = $this->_getPrivateUserWithUID('passwordHash', $uid);
             if (!password_verify($currentPassword, $row['passwordHash'])) {
-                throw PHPFastAuth\Errors::ERROR_PASSWORD_INCORRECT();
+                throw Errors::ERROR_PASSWORD_INCORRECT();
             }
             return $this->_updateUser([
                 'passwordHash' => password_hash($newPassword, PASSWORD_BCRYPT),
-                'passwordUpdatedAt' => $this->_getCurrentTimeForMySQL()
+                'passwordUpdatedAt' => Utils::_getCurrentTimeForMySQL()
             ], $uid);
         }
 
@@ -375,12 +392,12 @@ namespace {
         {
             return $this->_updateUser(['name' => $newName], $uid);
         }
-        public function updateExtraJson(string $uid, array $extraJson = null)
+        public function updateExtras(string $uid, array $extras = null)
         {
-            if ($extraJson == null) {
-                return $this->_updateUser(['extraJson' => null], $uid);
+            if ($extras == null) {
+                return $this->_updateUser(['extras' => null], $uid);
             }
-            return $this->_updateUser(['extraJson' => json_encode($extraJson)], $uid);
+            return $this->_updateUser(['extras' => json_encode($extras)], $uid);
         }
         // force
         public function disableUser(string $uid)
@@ -396,22 +413,22 @@ namespace {
 
         // *****************  *** ***************** authentication verify user ---------******
 
-        public function verifyToken(string $token)
+        public function verifyToken(string $token): string
         {
             $query = "SELECT * FROM `fast_auth_tokens` WHERE `token` = '$token'";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$res->num_rows) {
-                throw PHPFastAuth\Errors::ERROR_TOKEN_INVALID();
+                throw Errors::ERROR_TOKEN_INVALID();
             }
             if ($row = $res->fetch_assoc()) {
-                $timeGap = $this->_isValidTimePeriod($row['createdAt'], $row['expiresIn']);
+                $timeGap = Utils::_isValidTimePeriod($row['createdAt'], $row['expiresIn']);
                 if (!$timeGap) {
-                    throw PHPFastAuth\Errors::ERROR_TOKEN_EXPIRED();
+                    throw Errors::ERROR_TOKEN_EXPIRED();
                 } elseif ($row['disabled']) {
-                    throw PHPFastAuth\Errors::ERROR_TOKEN_DISABLED();
+                    throw Errors::ERROR_TOKEN_DISABLED();
                 } else {
                     $timeGap = $timeGap + $this->tokenExpirePeriod;
                     $q2 = "UPDATE `fast_auth_tokens` SET `expiresIn` = '$timeGap' WHERE `token` = '$token'";
@@ -419,29 +436,39 @@ namespace {
                     return $row['uid'];
                 }
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
         }
 
-        public function signOutAllDevices(string $uid, string $exceptToken = null)
+        public function signOutAllDevices(string $uid, string $exceptToken = null): void
         {
             $query = "UPDATE `fast_auth_tokens` SET `disabled` = 1 WHERE `uid` = '$uid'";
             if ($exceptToken) {
                 $query .= " AND `token` <> '$exceptToken'";
             }
             if (!$this->db->query($query)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
-            return true;
         }
 
-        /*   -------  ------- |  \        |   /\   -------  -------
+        /*------  ------- |  \        |   /\   -------  -------
         |      | |      | |   \      |   / \     |     |
         |------  \------  |    \    |   ----     |     -------  Functions:
         |       | \       |     \  |  /     \    |    |
         |      |   \      |      \| /        \   |    -------
 
 */
+
+        private function _setOptions(Options $option = null): void
+        {
+            if ($option == null)
+                $option = new Options();
+            $this->OTPLength = $option->OTPLength;
+            $this->OTPCharacters = $option->OTPCharacters;
+            $this->keyExpiresIn = $option->keyExpiresIn;
+            $this->tokenExpirePeriod = $option->tokenExpirePeriod;
+            $this->decodeOTPAttempts = $option->decodeOTPAttempts;
+        }
 
         private function _updateUser(array $arr, string $uid)
         {
@@ -456,7 +483,7 @@ namespace {
 
             $query = "UPDATE `fast_auth_users` SET $q WHERE `uid` = '$uid'";
             if (!$this->db->query($query)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             return true;
         }
@@ -466,15 +493,15 @@ namespace {
             $query = "SELECT $columns FROM `fast_auth_users` WHERE `uid` = '$uid'";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$res->num_rows) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
+                throw Errors::ERROR_USER_NOT_EXIST();
             }
             if ($row = $res->fetch_assoc()) {
                 return $row;
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
+                throw Errors::D_ERROR_UNKNOWN();
             }
         }
 
@@ -483,15 +510,15 @@ namespace {
             $query = "SELECT $columns FROM `fast_auth_users` WHERE `$key` = '$value' AND `type` = $type";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$res->num_rows) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
+                throw Errors::ERROR_USER_NOT_EXIST();
             }
             if ($row = $res->fetch_assoc()) {
                 return $row;
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
+                throw Errors::D_ERROR_UNKNOWN();
             }
         }
         private function _isUserExist(string $key, string $value, int $type)
@@ -499,7 +526,7 @@ namespace {
             try {
                 $this->_getPrivateUser('uid', $key, $value, $type);
                 return true;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return false;
             }
         }
@@ -508,71 +535,41 @@ namespace {
             try {
                 $this->_getPrivateUserWithUID('uid', $uid);
                 return true;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 return false;
             }
         }
 
-        private function _handleVerifySuccess(string $key)
-        {
-            $row = $this->_getKeyData($key, '*');
-            // todo change * to column names
-            $data = (array) json_decode($row['data']);
-            $this->_clearTable('fast_auth_temp', 'key', $key);
-            switch ($row['case']) {
-                case self::CASE_NEW_USER:
-                    $this->_insertUser($data, $row['uid']);
-                    return ['case' => $row['case'], 'uid' => $row['uid']];
-                    break;
-                case self::CASE_UPDATE_PASSWORD:
-                    $passwordUpdateKey = $this->_insertTemp($row['uid'], self::CASE_PRIVATE_PASSWORD_UPDATE, null, true);
-                    return ['case' => $row['case'], 'passwordUpdateKey' => $passwordUpdateKey];
-                    break;
-                case self::CASE_UPDATE_EMAIL:
-                case self::CASE_UPDATE_MOBILE:
-                    $this->_updateUser($data, $row['uid']);
-                    return ['case' => $row['case']];
-                    break;
-                default:
-                    throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
-                    break;
-            }
-        }
+
         // todo forceCreateUserWith* Function
-        private function _newTempUser(array $params, string $password, string $name, array $extraJson = null, string $uid = null, bool $isAnonymous = false)
+        private function _newTempUser(_SignUp $signUp, array $params): string
         {
-            $params['password'] = $password;
-            $params['name'] = $name;
-            $params['extraJson'] = $extraJson;
-            if ($uid == null) {
-                $uid = $this->_randomStr(self::UID_LENGTH);
-            }
-            if (!$isAnonymous && $this->_isUserExistWithUID($uid)) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
-            }
-            return $this->_insertTemp($uid, self::CASE_NEW_USER, $params);
+            if ($this->_isUserExistWithUID($signUp->uid))
+                throw Errors::ERROR_USER_NOT_EXIST();
+
+            return $this->_insertTemp($signUp->uid, self::CASE_NEW_USER, $params);
         }
 
-        private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false)
+        private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false): string
         {
             if ($checkIsUidExist && !$this->_isUserExistWithUID($uid)) { //check krna hai aur user exist nahi karta to
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
+                throw Errors::ERROR_USER_NOT_EXIST();
             }
-            $key = $this->_randomStr(self::KEY_LENGTH);
-            $currentDate = $this->_getCurrentTimeForMySQL();
+            $key = Utils::randomKey();
+            $currentDate = Utils::_getCurrentTimeForMySQL();
 
             $query = '';
             if ($params != null) {
-                $data = json_encode($this->_filterArray($params));
+                $data = json_encode(Utils::_filterArray($params));
                 $otp = $this->_generateRandomOTP();
-                $otpHash = $this->_cryptOTP($otp);
+                $otpHash = Utils::_cryptOTP($otp);
                 $query = "INSERT INTO `fast_auth_temp` (`key`,`uid`,`otpHash`,`createdAt`,`case`,`data`) VALUES ('$key', '$uid', '$otpHash', '$currentDate', '$case', '$data');";
             } else {
                 $query = "INSERT INTO `fast_auth_temp` (`key`,`uid`,`createdAt`,`case`) VALUES ('$key', '$uid', '$currentDate', '$case');";
             }
 
             if (!$this->db->query($query)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             return $key;
         }
@@ -584,24 +581,24 @@ namespace {
             $query = "SELECT $columns FROM `fast_auth_temp` WHERE `key` = '$key'";
             $res = $this->db->query($query);
             if (!$res) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             if (!$res->num_rows) {
-                throw PHPFastAuth\Errors::ERROR_KEY_INVALID();
+                throw Errors::ERROR_KEY_INVALID();
             }
             if ($row = $res->fetch_assoc()) {
                 return $row;
             } else {
-                throw PHPFastAuth\Errors::D_ERROR_UNKNOWN();
+                throw Errors::D_ERROR_UNKNOWN();
             }
         }
 
-        private function _insertUser(array $params, string $uid)
+        private function _insertUser(string $uid, array $params)
         {
             if (isset($params['mobile']) && $this->_isUserExist('mobile', $params['mobile'], $params['type'])) {
-                throw PHPFastAuth\Errors::ERROR_MOBILE_ALREADY_EXISTS();
+                throw Errors::ERROR_MOBILE_ALREADY_EXISTS();
             } elseif (isset($params['email']) && $this->_isUserExist('email', $params['email'], $params['type'])) {
-                throw PHPFastAuth\Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
             }
 
             // unset($params['case']);
@@ -613,41 +610,23 @@ namespace {
                     continue;
                 }
                 $colums .= "`$key`,";
-                if ($key === 'extraJson') {
+                if ($key === 'extras') {
                     $value = json_encode($value);
                 }
                 $values .= "'$value',";
             }
-            $currentTime = $this->_getCurrentTimeForMySQL();
+            $currentTime = Utils::_getCurrentTimeForMySQL();
             $query = "INSERT INTO `fast_auth_users` ($colums `uid`, `createdAt`, `passwordUpdatedAt`) VALUES 
         ($values '$uid', '$currentTime', '$currentTime');";
             if (!$this->db->query($query)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
-            }
-        }
-        private function _signIn(string $key, string $value, int $type, string $password = null, array $deviceJson = null)
-        {
-            $userArray = null;
-            if ($type == -11) {
-                $userArray = $this->_getPrivateUserWithUID('passwordHash, uid, disabled', $value);
-            } else {
-                $userArray = $this->_getPrivateUser('passwordHash, uid, disabled', $key, $value, $type);
-            }
-            if ($userArray == null) {
-                throw PHPFastAuth\Errors::ERROR_USER_NOT_EXIST();
-            } elseif ($key !== 'uid' && !password_verify($password, $userArray['passwordHash'])) {
-                throw PHPFastAuth\Errors::ERROR_PASSWORD_INCORRECT();
-            } elseif ($userArray['disabled'] == 1) {
-                throw PHPFastAuth\Errors::ERROR_USER_DISABLED();
-            } else {
-                return $this->_tokenSignIn($userArray['uid'], false, $deviceJson);
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
         }
 
         private function _tokenSignIn(string $uid, bool $isAnonymous, array $deviceJson = null)
         {
-            $token = $this->_randomStr(self::TOKEN_LENGTH);
-            $currentTime = $this->_getCurrentTimeForMySQL();
+            $token = Utils::randomToken();
+            $currentTime = Utils::_getCurrentTimeForMySQL();
             $expirePeriod = $this->tokenExpirePeriod;
             $query = '';
             if ($deviceJson != null) {
@@ -660,7 +639,7 @@ namespace {
             }
 
             if (!$this->db->query($query)) {
-                throw PHPFastAuth\Errors::D_ERROR_MYSQLI_QUERY();
+                throw Errors::D_ERROR_MYSQLI_QUERY();
             }
             return [
                 'uid' => $uid,
@@ -684,59 +663,147 @@ namespace {
             }
             return $randomString;
         }
-
-        // ********************-*-*-*-*-*-*-*-* UTILS **********-*-*-*-*-*-*-***************
-
-        private function _isValidTimePeriod(string $createdAt, int $expiresIn)
-        {
-            $time = strtotime($createdAt) + $expiresIn;
-            $currentTime = time();
-            if ($time > $currentTime) {
-                return $time - $currentTime;
-            }
-            return false;
-        }
-
-        private function _cryptOTP(string $otp)
-        {
-            return openssl_encrypt($otp, "AES-128-ECB", "__^!@XQ@z#$&*^%%Y&$&*^__");
-        }
-
-        private function _decryptOTP(string $otpHash)
-        {
-            return openssl_decrypt($otpHash, "AES-128-ECB", "__^!@XQ@z#$&*^%%Y&$&*^__");
-        }
-
-        private function _getCurrentTimeForMySQL()
-        {
-            return date('Y-m-d H:i:s', time());
-        }
-
-        private function _filterArray($array)
-        {
-            $newArr = [];
-            foreach ($array as $key => $value) {
-                if ($value === null) {
-                    continue;
-                }
-                if ($key === 'password') {
-                    $key = 'passwordHash';
-                    $value = password_hash($value, PASSWORD_BCRYPT);
-                }
-                $newArr[$key] = $value;
-            }
-            return $newArr;
-        }
-        private function _randomStr(int $length)
-        {
-            return bin2hex(openssl_random_pseudo_bytes($length));
-        }
     }
 }
 
 namespace PHPFastAuth {
 
 
+
+    class SignUpWithMobile extends _SignUp
+    {
+        public function __construct(string $mobile)
+        {
+            $this->init();
+            $this->mobile = $mobile;
+        }
+    }
+
+    class SignUpWithEmail extends _SignUp
+    {
+        public function __construct(string $email)
+        {
+            $this->init();
+            $this->email = $email;
+        }
+    }
+
+    class SignInWithMobile extends _SignIn
+    {
+        public function __construct(string $mobile)
+        {
+            $this->init();
+            $this->mobile = $mobile;
+        }
+    }
+
+    class SignInWithEmail extends _SignIn
+    {
+        public function __construct(string $email)
+        {
+            $this->init();
+            $this->email = $email;
+        }
+    }
+    class SignInWithUID extends _SignIn
+    {
+        public function __construct(string $uid)
+        {
+            $this->init();
+            $this->uid = $uid;
+        }
+    }
+
+    class _SignIn
+    {
+        protected function init()
+        {
+            $this->type = 0;
+            $this->uid = null;
+            $this->email = null;
+            $this->mobile = null;
+            $this->password = null;
+        }
+        public function setPassword(string $password): void
+        {
+            $this->password = $password;
+        }
+        public function setType(int $type): void
+        {
+            $this->type = $type;
+        }
+    }
+
+    class _SignUp
+    {
+        protected function init()
+        {
+            $this->type = 0;
+            $this->uid = Utils::randomUID();
+            $this->email = null;
+            $this->mobile = null;
+            $this->name = null;
+            $this->password = null;
+            $this->extras = null;
+        }
+        public function setPassword(string $password): void
+        {
+            $this->password = $password;
+        }
+        public function setName(string $name): void
+        {
+            $this->name = $name;
+        }
+        public function setType(int $type): void
+        {
+            $this->type = $type;
+        }
+        public function setExtras(array $extras): void
+        {
+            $this->extras = $extras;
+        }
+        public function setUid(string $uid): void
+        {
+            $this->uid = $uid;
+        }
+    }
+
+    class OTPData
+    {
+        public function __construct(string $otp, int $case, string $name)
+        {
+            $this->otp = $otp;
+            $this->case = $case;
+            $this->name = $name;
+            $this->type = null;
+            $this->mobile = null;
+            $this->email = null;
+        }
+        public function getOTP(): string
+        {
+            return $this->otp;
+        }
+        function getCase(): int
+        {
+            return $this->case;
+        }
+        function getName(): string
+        {
+            return $this->name;
+        }
+        public function getMobile(): string
+        {
+            return $this->mobile;
+        }
+        public function getEmail(): string
+        {
+            return $this->email;
+        }
+        public function getType(): string
+        {
+            return $this->type;
+        }
+    }
 
     class Options
     {
@@ -770,9 +837,77 @@ namespace PHPFastAuth {
         }
     }
 
+    class Utils
+    {
+        static function _isValidTimePeriod(string $createdAt, int $expiresIn): int
+        {
+            $time = strtotime($createdAt) + $expiresIn;
+            $currentTime = time();
+            if ($time > $currentTime) {
+                return $time - $currentTime;
+            }
+            return 0;
+        }
+
+        static function _cryptOTP(string $otp): string
+        {
+            return openssl_encrypt($otp, "AES-128-ECB", "__^!@XQ@z#$&*^%%Y&$&*^__");
+        }
+
+        static function _decryptOTP(string $otpHash): string
+        {
+            return openssl_decrypt($otpHash, "AES-128-ECB", "__^!@XQ@z#$&*^%%Y&$&*^__");
+        }
+
+        static function _getCurrentTimeForMySQL(): string
+        {
+            return date('Y-m-d H:i:s', time());
+        }
+
+        static function _filterArray($array): array
+        {
+            $newArr = [];
+            foreach ($array as $key => $value) {
+                if ($value === null) {
+                    continue;
+                }
+                if ($key === 'password') {
+                    $key = 'passwordHash';
+                    $value = password_hash($value, PASSWORD_BCRYPT);
+                }
+                $newArr[$key] = $value;
+            }
+            return $newArr;
+        }
+
+        private const UID_LENGTH = 16;
+        private const TOKEN_LENGTH = 39;
+        private const KEY_LENGTH = 32;
+
+
+        static function randomUID(): string
+        {
+            return self::_randomStr(self::UID_LENGTH);
+        }
+        static function randomKey(): string
+        {
+            return self::_randomStr(self::KEY_LENGTH);
+        }
+        static function randomToken(): string
+        {
+            return self::_randomStr(self::TOKEN_LENGTH);
+        }
+        private static function _randomStr(int $length): string
+        {
+            return bin2hex(openssl_random_pseudo_bytes($length));
+        }
+    }
+
+
     class Errors
     {
         public const ERROR_CODE = 30;
+        public const ERROR_NO_EMIAL_OR_MOBILE_PROVIDED_CODE = 46;
         public const ERROR_EMAIL_ALREADY_EXISTS_CODE = 31;
         public const ERROR_MOBILE_ALREADY_EXISTS_CODE = 32;
         public const ERROR_OTP_GET_ATTEMPTS_CODE = 38;
@@ -801,6 +936,10 @@ namespace PHPFastAuth {
         public static function ERROR(): \Exception
         {
             return new \Exception('Fast-Auth Error', self::ERROR_CODE);
+        }
+        public static function ERROR_NO_EMIAL_OR_MOBILE_PROVIDED()
+        {
+            return new \Exception('No email or moblie is provided', self::ERROR_NO_EMIAL_OR_MOBILE_PROVIDED_CODE);
         }
         public static function ERROR_EMAIL_ALREADY_EXISTS(): \Exception
         {
