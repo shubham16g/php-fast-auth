@@ -29,7 +29,6 @@ try {
             case PHPFastAuth::CASE_NEW_USER:
                 $signIn = new PHPFastAuth\SignInWithUID($result['uid']);
                 $signInResult = $auth->signInWithoutPassword($signIn);
-                $_SESSION['uid'] = $signInResult['uid'];
                 $_SESSION['token'] = $signInResult['token'];
                 $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
                 // $content = json_encode($signInResult);

@@ -11,7 +11,6 @@ if (!isset($_GET['type'])) {
     header("Location: index.php");
 }
 $type = $_GET['type'];
-$uid = $_SESSION['uid'];
 
 require_once dirname(__FILE__, 2) . '/PHPFastAuth.php';
 require_once dirname(__FILE__, 1) . '/config.php';
@@ -19,7 +18,7 @@ require_once dirname(__FILE__, 1) . '/config.php';
 try {
 
     $auth = new PHPFastAuth($db);
-
+    $uid = $auth->verifyToken($_SESSION['token']);
 
     if (isset($_POST['submit'])) {
         $key;

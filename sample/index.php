@@ -12,8 +12,7 @@ require_once dirname(__FILE__, 1) . '/config.php';
 $userData;
 try {
     $auth = new PHPFastAuth($db);
-    $uid = $_SESSION['uid'];
-    $auth->verifyToken($_SESSION['token']);
+    $uid = $auth->verifyToken($_SESSION['token']);
     $userData = $auth->getUser($uid);
 
     if (isset($_POST['updateMobile'])) {

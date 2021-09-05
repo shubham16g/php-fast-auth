@@ -26,7 +26,6 @@ if (isset($_POST['submit'])) {
         $signIn->setPassword($password);
         $signInResult = $auth->signIn($signIn);
 
-        $_SESSION['uid'] = $signInResult['uid'];
         $_SESSION['token'] = $signInResult['token'];
         $_SESSION['isAnonymous'] = $signInResult['isAnonymous'];
         header("Location: ./index.php");

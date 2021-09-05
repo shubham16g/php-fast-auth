@@ -1,19 +1,19 @@
 <?php
 /*
 PHPFastAuth
-Version: 0.9.1 Beta
+Version: 0.9.3 Beta
 Developer: Shubham Gupta
 Licence: MIT
-Last Updated: 20 Aug, 2021 at 9:42 PM UTC +5:30
+Last Updated: 5 Sep, 2021 at 1:27 PM UTC +5:30
 */
 
 namespace {
 
     use PHPFastAuth\_SignIn;
+    use PHPFastAuth\_SignUp;
     use PHPFastAuth\Options;
     use PHPFastAuth\Errors;
     use PHPFastAuth\OTPData;
-    use PHPFastAuth\_SignUp;
     use PHPFastAuth\SignInWithUID;
     use PHPFastAuth\Utils;
 
@@ -38,11 +38,9 @@ namespace {
             }
             $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, TRUE);
             $this->db = $db;
-
-            $this->initialize();
         }
 
-        public function initialize()
+        public function install()
         {
             $createUsersTable = "CREATE TABLE IF NOT EXISTS `fast_auth_users` (
             `uid` VARCHAR(255) NOT NULL ,
@@ -92,10 +90,11 @@ namespace {
         }
 
         // todo return type
-        public function forceSignUp(_SignUp $signUp)
+        public function forceSignUp(_SignUp $signUp) : string
         {
             $params = $this->_validateSignUp($signUp);
-            return $this->_insertUser($signUp->uid, $params);
+            $this->_insertUser($signUp->uid, $params);
+            return $signUp->uid;
         }
 
         public function signUpRequest(_SignUp $signUp): string
@@ -109,7 +108,7 @@ namespace {
             $params = [];
             if ($signUp->mobile != null) {
                 if ($this->_isUserExist('mobile', $signUp->mobile, $signUp->type))
-                    throw Errors::ERROR_EMAIL_ALREADY_EXISTS();
+                    throw Errors::ERROR_MOBILE_ALREADY_EXISTS();
                 $params['mobile'] = $signUp->mobile;
             } elseif ($signUp->email != null) {
                 if ($this->_isUserExist('email', $signUp->email, $signUp->type))
