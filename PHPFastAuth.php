@@ -4,7 +4,7 @@ PHPFastAuth
 Version: 0.9.3 Beta
 Developer: Shubham Gupta
 Licence: MIT
-Last Updated: 5 Sep, 2021 at 1:27 PM UTC +5:30
+Last Updated: 7 Sep, 2021 at 4:51 PM UTC +5:30
 */
 
 namespace {
@@ -70,7 +70,7 @@ namespace {
 
             $createTokensTable = "CREATE TABLE IF NOT EXISTS `fast_auth_tokens` (
             `token` VARCHAR(255) NOT NULL ,
-            `uid` INT(11) NOT NULL ,
+            `uid` VARCHAR(255) NOT NULL ,
             `createdAt` DATETIME NOT NULL ,
             `expiresIn` INT(11) NOT NULL ,
             `disabled` TINYINT(1) NOT NULL default 0 ,
@@ -90,7 +90,7 @@ namespace {
         }
 
         // todo return type
-        public function forceSignUp(_SignUp $signUp) : string
+        public function forceSignUp(_SignUp $signUp): string
         {
             $params = $this->_validateSignUp($signUp);
             $this->_insertUser($signUp->uid, $params);
@@ -117,7 +117,7 @@ namespace {
             } else {
                 throw Errors::ERROR_NO_EMIAL_OR_MOBILE_PROVIDED();
             }
-            if ($this->_isUserExistWithUID($signUp->uid)) {
+            if ($this->isUserExistWithUID($signUp->uid)) {
                 throw Errors::ERROR_USER_NOT_EXIST();
             }
             // todo name, password, extras
@@ -202,7 +202,7 @@ namespace {
 
         // **************************** SIGNIN PROCESS *-********************************----*******
 
-        public function signInAnonymously(array $deviceJson = null)
+        public function signInAnonymously(array $deviceJson = null): string
         {
             $uid = Utils::randomUID();
             $this->_insertUser(
@@ -211,20 +211,20 @@ namespace {
                     'isAnonymous' => 1,
                 ]
             );
-            return $this->_tokenSignIn($uid, true, $deviceJson);
+            return $this->_tokenSignIn($uid, $deviceJson);
         }
 
-        public function signIn(_SignIn $signIn)
+        public function signIn(_SignIn $signIn): string
         {
             return $this->_signIn($signIn, false);
         }
 
-        public function signInWithoutPassword(SignInWithUID $signIn)
+        public function signInWithoutPassword(SignInWithUID $signIn): string
         {
             return $this->_signIn($signIn, true);
         }
 
-        private function _signIn(_SignIn $signIn, bool $forced)
+        private function _signIn(_SignIn $signIn, bool $forced): string
         {
             $userArray = null;
             if ($signIn->uid != null) {
@@ -243,7 +243,7 @@ namespace {
             } elseif ($userArray['disabled'] == 1) {
                 throw Errors::ERROR_USER_DISABLED();
             } else {
-                return $this->_tokenSignIn($userArray['uid'], false, null);
+                return $this->_tokenSignIn($userArray['uid'], null);
             }
         }
 
@@ -256,15 +256,11 @@ namespace {
         {
             return $this->_getPrivateUserWithUID('extras', $uid);
         }
-        public function isValidUser(string $uid)
-        {
-            return $this->_isUserExistWithUID($uid);
-        }
-        public function getUserByMobileNumber(string $mobile, int $type = 0)
+        public function getUserWithMobile(string $mobile, int $type = 0)
         {
             return $this->_getPrivateUser('*', 'mobile', $mobile, $type);
         }
-        public function getUserByEmail(string $email, int $type = 0)
+        public function getUserWithEmail(string $email, int $type = 0)
         {
             return $this->_getPrivateUser('*', 'email', $email, $type);
         }
@@ -520,6 +516,14 @@ namespace {
                 throw Errors::D_ERROR_UNKNOWN();
             }
         }
+        public function isUserExistWithMobile(string $mobile, int $type = 0)
+        {
+            return $this->_isUserExist('mobile', $mobile, $type);
+        }
+        public function isUserExistWithEmail(string $email, int $type = 0)
+        {
+            return $this->_isUserExist('email', $email, $type);
+        }
         private function _isUserExist(string $key, string $value, int $type)
         {
             try {
@@ -529,7 +533,8 @@ namespace {
                 return false;
             }
         }
-        private function _isUserExistWithUID(string $uid)
+
+        public function isUserExistWithUID(string $uid)
         {
             try {
                 $this->_getPrivateUserWithUID('uid', $uid);
@@ -543,7 +548,7 @@ namespace {
         // todo forceCreateUserWith* Function
         private function _newTempUser(_SignUp $signUp, array $params): string
         {
-            if ($this->_isUserExistWithUID($signUp->uid))
+            if ($this->isUserExistWithUID($signUp->uid))
                 throw Errors::ERROR_USER_NOT_EXIST();
 
             return $this->_insertTemp($signUp->uid, self::CASE_NEW_USER, $params);
@@ -551,7 +556,7 @@ namespace {
 
         private function _insertTemp(string $uid, int $case, array $params = null, bool $checkIsUidExist = false): string
         {
-            if ($checkIsUidExist && !$this->_isUserExistWithUID($uid)) { //check krna hai aur user exist nahi karta to
+            if ($checkIsUidExist && !$this->isUserExistWithUID($uid)) { //check krna hai aur user exist nahi karta to
                 throw Errors::ERROR_USER_NOT_EXIST();
             }
             $key = Utils::randomKey();
@@ -622,7 +627,7 @@ namespace {
             }
         }
 
-        private function _tokenSignIn(string $uid, bool $isAnonymous, array $deviceJson = null)
+        private function _tokenSignIn(string $uid, array $deviceJson = null): string
         {
             $token = Utils::randomToken();
             $currentTime = Utils::_getCurrentTimeForMySQL();
@@ -640,11 +645,7 @@ namespace {
             if (!$this->db->query($query)) {
                 throw Errors::D_ERROR_MYSQLI_QUERY();
             }
-            return [
-                'uid' => $uid,
-                'token' => $token,
-                'isAnonymous' => $isAnonymous
-            ];
+            return $token;
         }
 
         private function _clearTable(string $tableName, string $column, string $value)
