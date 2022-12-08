@@ -1,0 +1,21 @@
+{
+    "name": "shubham-gupta-16/php-fast-auth",
+    "type": "library",
+    "description": "Simple Api Authentication Solution for core php project",
+    "require": {
+        "php": ">=7.4"
+    },
+    "keywords": [
+        "php",
+        "auth",
+        "authentication",
+        "api",
+        "token",
+        "password"
+    ],
+    "homepage": "https://github.com/shubham-gupta-16/php-fast-auth",
+    "license": "MIT",
+    "authors": [
+        {"name": "Shubham Gupta"}
+    ]
+}
